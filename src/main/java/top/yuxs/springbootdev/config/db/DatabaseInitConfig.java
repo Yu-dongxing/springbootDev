@@ -1,5 +1,6 @@
 package top.yuxs.springbootdev.config.db;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import top.yuxs.springbootdev.db.DatabaseInitService;
@@ -7,6 +8,7 @@ import top.yuxs.springbootdev.db.DatabaseInitService;
 import java.sql.SQLException;
 
 @Configuration
+@ConditionalOnProperty(prefix = "db.init", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class DatabaseInitConfig {
 
     private final DatabaseInitService databaseInitService;

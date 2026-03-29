@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -13,6 +15,7 @@ import top.yuxs.springbootdev.annotation.db.*;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
+import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.Date;
 import java.sql.ResultSet;
@@ -21,14 +24,19 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class DatabaseInitService {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Value("${db.init.base-package}")
+    private String basePackage;
+
     public void initDatabase() throws SQLException {
-        List<Class<?>> entityClasses = scanEntityClasses("top.yuxs.springbootdev.pojo");
+        log.info("开始数据库初始化，扫描包: {}", basePackage);
+        List<Class<?>> entityClasses = scanEntityClasses(basePackage);
 
         for (Class<?> entityClass : entityClasses) {
             TableName tableNameAnnotation = entityClass.getAnnotation(TableName.class);
@@ -48,8 +56,7 @@ public class DatabaseInitService {
                 Class<?> entityClass = Class.forName(beanDef.getBeanClassName());
                 entityClasses.add(entityClass);
             } catch (ClassNotFoundException e) {
-                System.err.println("Class not found: " + beanDef.getBeanClassName());
-                e.printStackTrace();
+                log.error("未找到类: {}", beanDef.getBeanClassName(), e);
             }
         }
         return entityClasses;
@@ -65,7 +72,7 @@ public class DatabaseInitService {
             Integer count = jdbcTemplate.queryForObject(sql, Integer.class, tableName);
             return count != null && count > 0;
         } catch (Exception e) {
-            System.err.println("Error checking if table " + tableName + " exists: " + e.getMessage());
+            log.error("检查表 {} 是否存在时发生错误: {}", tableName, e.getMessage());
             // 在检查阶段发生错误时，保守地认为表不存在，以便尝试创建
             return false;
         }
@@ -127,12 +134,11 @@ public class DatabaseInitService {
             // 处理表注释
             createTableSQL.append(getTableCommentSql(entityClass));
             createTableSQL.append(";");
-            System.out.println("Executing SQL: " + createTableSQL);
+            log.info("执行 SQL: {}", createTableSQL);
             jdbcTemplate.execute(createTableSQL.toString());
-            System.out.println("Created table " + tableName);
+            log.info("创建表 {} 成功", tableName);
         } catch (Exception e) {
-            System.err.println("Error creating table " + tableName + ": " + e.getMessage());
-            e.printStackTrace();
+            log.error("创建表 {} 时发生错误: {}", tableName, e.getMessage(), e);
         }
     }
     // updateTable
@@ -159,11 +165,11 @@ public class DatabaseInitService {
                         String addColumnSQL = String.format("ALTER TABLE %s ADD COLUMN %s %s %s %s;",
                                 tableName, columnName, dataType, defaultValueSql, commentSql);
                         try {
-                            System.out.println("Executing SQL: " + addColumnSQL);
+                            log.info("执行 SQL: {}", addColumnSQL);
                             jdbcTemplate.execute(addColumnSQL);
-                            System.out.println("Added column " + columnName + " to table " + tableName);
+                            log.info("向表 {} 添加列 {} 成功", tableName, columnName);
                         } catch (Exception e) {
-                            System.err.println("Failed to add column " + columnName + " to table " + tableName + ": " + e.getMessage());
+                            log.error("向表 {} 添加列 {} 失败: {}", tableName, columnName, e.getMessage());
                         }
                     }
                 }
@@ -176,11 +182,11 @@ public class DatabaseInitService {
                 if (!existingIndexes.contains(index.name().toLowerCase())) {
                     String addIndexSql = "ALTER TABLE " + tableName + " ADD " + buildIndexDefinition(index) + ";";
                     try {
-                        System.out.println("Executing SQL: " + addIndexSql);
+                        log.info("执行 SQL: {}", addIndexSql);
                         jdbcTemplate.execute(addIndexSql);
-                        System.out.println("Added index " + index.name() + " to table " + tableName);
+                        log.info("向表 {} 添加索引 {} 成功", tableName, index.name());
                     } catch (Exception e) {
-                        System.err.println("Failed to add index " + index.name() + " to table " + tableName + ": " + e.getMessage());
+                        log.error("向表 {} 添加索引 {} 失败: {}", tableName, index.name(), e.getMessage());
                     }
                 }
             }
@@ -192,16 +198,16 @@ public class DatabaseInitService {
                 if (!existingForeignKeys.contains(fk.name().toLowerCase())) {
                     String addFkSql = "ALTER TABLE " + tableName + " ADD " + buildForeignKeyDefinition(fk) + ";";
                     try {
-                        System.out.println("Executing SQL: " + addFkSql);
+                        log.info("执行 SQL: {}", addFkSql);
                         jdbcTemplate.execute(addFkSql);
-                        System.out.println("Added foreign key " + fk.name() + " to table " + tableName);
+                        log.info("向表 {} 添加外键 {} 成功", tableName, fk.name());
                     } catch (Exception e) {
-                        System.err.println("Failed to add foreign key " + fk.name() + " to table " + tableName + ": " + e.getMessage());
+                        log.error("向表 {} 添加外键 {} 失败: {}", tableName, fk.name(), e.getMessage());
                     }
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error updating table " + tableName + ": " + e.getMessage());
+            log.error("更新表 {} 时发生错误: {}", tableName, e.getMessage());
             throw e;
         }
     }
@@ -238,13 +244,14 @@ public class DatabaseInitService {
         return fkList.stream().map(String::toLowerCase).collect(Collectors.toSet());
     }
     private boolean columnExists(String tableName, String columnName) throws SQLException {
-        try {
-            DatabaseMetaData metaData = jdbcTemplate.getDataSource().getConnection().getMetaData();
+        // 使用 try-with-resources 自动关闭连接，修复潜在的连接泄露风险
+        try (Connection connection = jdbcTemplate.getDataSource().getConnection()) {
+            DatabaseMetaData metaData = connection.getMetaData();
             try (ResultSet rs = metaData.getColumns(null, null, tableName, columnName)) {
                 return rs.next();
             }
         } catch (Exception e) {
-            System.err.println("Error checking if column " + columnName + " exists in table " + tableName + ": " + e.getMessage());
+            log.error("检查表 {} 中的列 {} 是否存在时发生错误: {}", tableName, columnName, e.getMessage());
             throw e;
         }
     }
@@ -258,7 +265,7 @@ public class DatabaseInitService {
             Integer count = jdbcTemplate.queryForObject(sql, Integer.class, tableName, indexName);
             return count != null && count > 0;
         } catch (Exception e) {
-            System.err.println("Error checking if index " + indexName + " exists in table " + tableName + ": " + e.getMessage());
+            log.error("检查表 {} 中的索引 {} 是否存在时发生错误: {}", tableName, indexName, e.getMessage());
             // 发生错误时，保守地返回true，避免重复创建导致失败
             return true;
         }
