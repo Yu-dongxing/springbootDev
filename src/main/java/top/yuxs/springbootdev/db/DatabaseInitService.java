@@ -14,12 +14,8 @@ import org.springframework.stereotype.Service;
 import top.yuxs.springbootdev.annotation.db.*;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.Date;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -34,17 +30,30 @@ public class DatabaseInitService {
     @Value("${db.init.base-package}")
     private String basePackage;
 
-    public void initDatabase() throws SQLException {
+    /**
+     * 初始化入口
+     */
+    public void initDatabase() {
         log.info("开始数据库初始化，扫描包: {}", basePackage);
         List<Class<?>> entityClasses = scanEntityClasses(basePackage);
 
+        // 第一阶段：创建或更新表结构、索引（不含外键）
         for (Class<?> entityClass : entityClasses) {
             TableName tableNameAnnotation = entityClass.getAnnotation(TableName.class);
             if (tableNameAnnotation != null) {
                 String tableName = tableNameAnnotation.value();
-                createOrUpdateTable(entityClass, tableName);
+                syncTableStructure(entityClass, tableName);
             }
         }
+
+        // 第二阶段：统一处理外键约束（解决循环依赖）
+        for (Class<?> entityClass : entityClasses) {
+            TableName tableNameAnnotation = entityClass.getAnnotation(TableName.class);
+            if (tableNameAnnotation != null) {
+                syncForeignKeys(entityClass, tableNameAnnotation.value());
+            }
+        }
+        log.info("数据库初始化完成");
     }
 
     private List<Class<?>> scanEntityClasses(String basePackage) {
@@ -62,232 +71,207 @@ public class DatabaseInitService {
         return entityClasses;
     }
 
-
-    private boolean tableExists(String tableName) {
-        try {
-            // 使用 information_schema 进行精确查询，避免大小写和 schema 带来的问题
-            // DATABASE() 函数会返回当前连接的数据库名，确保只在当前库中查找
-            String sql = "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
-            // 使用 jdbcTemplate 查询，更符合Spring的最佳实践
-            Integer count = jdbcTemplate.queryForObject(sql, Integer.class, tableName);
-            return count != null && count > 0;
-        } catch (Exception e) {
-            log.error("检查表 {} 是否存在时发生错误: {}", tableName, e.getMessage());
-            // 在检查阶段发生错误时，保守地认为表不存在，以便尝试创建
-            return false;
-        }
-    }
-
-
-    private void createOrUpdateTable(Class<?> entityClass, String tableName) throws SQLException {
+    /**
+     * 第一阶段：同步表结构（列新增/修改，索引同步）
+     */
+    private void syncTableStructure(Class<?> entityClass, String tableName) {
         if (!tableExists(tableName)) {
             createTable(entityClass, tableName);
         } else {
-            updateTable(entityClass, tableName);
+            updateTableColumnsAndIndexes(entityClass, tableName);
         }
     }
 
     private void createTable(Class<?> entityClass, String tableName) {
         try {
-            StringBuilder createTableSQL = new StringBuilder("CREATE TABLE ");
-            createTableSQL.append(tableName).append(" (");
+            StringBuilder sql = new StringBuilder("CREATE TABLE `").append(tableName).append("` (");
             List<Field> fields = getAllFields(entityClass);
             List<String> definitions = new ArrayList<>();
             boolean hasPrimaryKey = false;
-            for (Field field : fields) {
-                // 跳过静态字段或 Mybatis-Plus 的 a `serialVersionUID` 字段
-                if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) || "serialVersionUID".equals(field.getName())) {
-                    continue;
-                }
-                TableId tableId = field.getAnnotation(TableId.class);
-                TableField tableField = field.getAnnotation(TableField.class);
-                String columnName = null;
-                String dataType = null;
-                String defaultValueSql = getDefaultValueSql(field);
-                String commentSql = getColumnCommentSql(field);
-                if (tableId != null) {
-                    columnName = tableId.value().isEmpty() ? field.getName() : tableId.value();
-                    dataType = getDataType(field);
-                    String autoIncrement = "";
-                    // 只有明确指定为 AUTO 时才加自增关键字
-                    if (tableId.type() == IdType.AUTO) {
-                        autoIncrement = " AUTO_INCREMENT";
-                    }
-                    definitions.add(columnName + " " + dataType + " PRIMARY KEY" + autoIncrement + defaultValueSql + commentSql);
-                    hasPrimaryKey = true;
-                } else if (tableField != null && tableField.exist()) {
-                    columnName = tableField.value().isEmpty() ? field.getName() : tableField.value();
-                    dataType = getDataType(field);
-                    definitions.add(columnName + " " + dataType + defaultValueSql + commentSql);
-                }
-            }
-            if (!hasPrimaryKey) {
-                definitions.add(0, "id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID'");
-            }
-            List<String> indexDefinitions = getIndexDefinitionsSQL(entityClass);
-            definitions.addAll(indexDefinitions);
 
-            // 处理外键
-            List<String> foreignKeyDefinitions = getForeignKeyDefinitionsSQL(entityClass);
-            definitions.addAll(foreignKeyDefinitions);
-            createTableSQL.append(String.join(", ", definitions)).append(")");
-            // 处理表注释
-            createTableSQL.append(getTableCommentSql(entityClass));
-            createTableSQL.append(";");
-            log.info("执行 SQL: {}", createTableSQL);
-            jdbcTemplate.execute(createTableSQL.toString());
-            log.info("创建表 {} 成功", tableName);
+            for (Field field : fields) {
+                if (isIgnoreField(field)) continue;
+                String columnDef = buildColumnDefinition(field);
+                if (columnDef != null) {
+                    definitions.add(columnDef);
+                    if (field.isAnnotationPresent(TableId.class)) hasPrimaryKey = true;
+                }
+            }
+
+            if (!hasPrimaryKey) {
+                definitions.add(0, "`id` BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID'");
+            }
+
+            definitions.addAll(getIndexDefinitionsSQL(entityClass));
+            sql.append(String.join(", ", definitions)).append(")");
+            sql.append(getTableCommentSql(entityClass));
+            sql.append(";");
+
+            log.info("执行建表 SQL: {}", sql);
+            jdbcTemplate.execute(sql.toString());
         } catch (Exception e) {
-            log.error("创建表 {} 时发生错误: {}", tableName, e.getMessage(), e);
+            log.error("创建表 {} 失败: {}", tableName, e.getMessage());
         }
     }
-    // updateTable
-    private void updateTable(Class<?> entityClass, String tableName) throws SQLException {
+
+    private void updateTableColumnsAndIndexes(Class<?> entityClass, String tableName) {
         try {
-            // 批量获取数据库中已存在的元数据
-            Set<String> existingColumns = getExistingColumns(tableName);
+            Map<String, String> existingColumnsMap = getExistingColumnsInfo(tableName);
             Set<String> existingIndexes = getExistingIndexNames(tableName);
-            Set<String> existingForeignKeys = getExistingForeignKeyNames(tableName);
-            // 检查并添加新列
             List<Field> fields = getAllFields(entityClass);
+
             for (Field field : fields) {
-                if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) || "serialVersionUID".equals(field.getName())) {
-                    continue;
-                }
-                TableField tableField = field.getAnnotation(TableField.class);
-                if (tableField != null && tableField.exist()) {
-                    String columnName = tableField.value().isEmpty() ? field.getName() : tableField.value();
-                    // 在内存中检查，而不是查询数据库
-                    if (!existingColumns.contains(columnName.toLowerCase())) { // 注意：数据库元数据可能返回全小写或大写，统一转小写比较保险
-                        String dataType = getDataType(field);
-                        String defaultValueSql = getDefaultValueSql(field);
-                        String commentSql = getColumnCommentSql(field);
-                        String addColumnSQL = String.format("ALTER TABLE %s ADD COLUMN %s %s %s %s;",
-                                tableName, columnName, dataType, defaultValueSql, commentSql);
-                        try {
-                            log.info("执行 SQL: {}", addColumnSQL);
-                            jdbcTemplate.execute(addColumnSQL);
-                            log.info("向表 {} 添加列 {} 成功", tableName, columnName);
-                        } catch (Exception e) {
-                            log.error("向表 {} 添加列 {} 失败: {}", tableName, columnName, e.getMessage());
-                        }
+                if (isIgnoreField(field)) continue;
+
+                String columnName = getColumnName(field);
+                if (columnName == null) continue;
+
+                String targetDefinition = buildColumnDefinition(field);
+                String targetTypeOnly = getDataType(field).toLowerCase().replaceAll("\\s", "");
+
+                if (!existingColumnsMap.containsKey(columnName.toLowerCase())) {
+                    // 情况1：列不存在，执行新增
+                    String sql = String.format("ALTER TABLE `%s` ADD COLUMN %s;", tableName, targetDefinition);
+                    log.info("表 {} 新增列: {}", tableName, columnName);
+                    jdbcTemplate.execute(sql);
+                } else {
+                    // 情况2：列存在，检查类型是否匹配（简单比对类型字符串）
+                    String existingType = existingColumnsMap.get(columnName.toLowerCase()).toLowerCase().replaceAll("\\s", "");
+                    // 如果定义中不包含现有类型（比如 varchar(255) vs varchar），则执行修改
+                    if (!targetTypeOnly.equals(existingType)) {
+                        String sql = String.format("ALTER TABLE `%s` MODIFY COLUMN %s;", tableName, targetDefinition);
+                        log.info("表 {} 变更列类型: {} -> {}", tableName, existingType, targetTypeOnly);
+                        jdbcTemplate.execute(sql);
                     }
                 }
             }
 
-            // 检查并添加新索引
+            // 索引同步
             Index[] indexes = entityClass.getAnnotationsByType(Index.class);
             for (Index index : indexes) {
-                // 在内存中检查
                 if (!existingIndexes.contains(index.name().toLowerCase())) {
-                    String addIndexSql = "ALTER TABLE " + tableName + " ADD " + buildIndexDefinition(index) + ";";
-                    try {
-                        log.info("执行 SQL: {}", addIndexSql);
-                        jdbcTemplate.execute(addIndexSql);
-                        log.info("向表 {} 添加索引 {} 成功", tableName, index.name());
-                    } catch (Exception e) {
-                        log.error("向表 {} 添加索引 {} 失败: {}", tableName, index.name(), e.getMessage());
-                    }
+                    String sql = "ALTER TABLE `" + tableName + "` ADD " + buildIndexDefinition(index) + ";";
+                    jdbcTemplate.execute(sql);
+                    log.info("表 {} 新增索引: {}", tableName, index.name());
                 }
             }
+        } catch (Exception e) {
+            log.error("更新表 {} 失败: {}", tableName, e.getMessage());
+        }
+    }
 
-            // 检查并添加新外键
+    /**
+     * 第二阶段：同步外键
+     */
+    private void syncForeignKeys(Class<?> entityClass, String tableName) {
+        try {
+            Set<String> existingFks = getExistingForeignKeyNames(tableName);
             ForeignKey[] foreignKeys = entityClass.getAnnotationsByType(ForeignKey.class);
             for (ForeignKey fk : foreignKeys) {
-                // 在内存中检查
-                if (!existingForeignKeys.contains(fk.name().toLowerCase())) {
-                    String addFkSql = "ALTER TABLE " + tableName + " ADD " + buildForeignKeyDefinition(fk) + ";";
-                    try {
-                        log.info("执行 SQL: {}", addFkSql);
-                        jdbcTemplate.execute(addFkSql);
-                        log.info("向表 {} 添加外键 {} 成功", tableName, fk.name());
-                    } catch (Exception e) {
-                        log.error("向表 {} 添加外键 {} 失败: {}", tableName, fk.name(), e.getMessage());
-                    }
+                if (!existingFks.contains(fk.name().toLowerCase())) {
+                    String sql = "ALTER TABLE `" + tableName + "` ADD " + buildForeignKeyDefinition(fk) + ";";
+                    jdbcTemplate.execute(sql);
+                    log.info("表 {} 新增外键: {}", tableName, fk.name());
                 }
             }
         } catch (Exception e) {
-            log.error("更新表 {} 时发生错误: {}", tableName, e.getMessage());
-            throw e;
+            log.error("同步表 {} 外键失败: {}", tableName, e.getMessage());
         }
     }
 
-// 用于批量获取元数据 ▼▼▼
+    private String buildColumnDefinition(Field field) {
+        String columnName = getColumnName(field);
+        if (columnName == null) return null;
 
-    /**
-     * 批量获取一个表的所有列名
-     */
-    private Set<String> getExistingColumns(String tableName) {
-        // 使用 information_schema 效率更高
-        String sql = "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
-        List<String> columnList = jdbcTemplate.queryForList(sql, String.class, tableName);
-        // 转为小写并存入Set，便于快速、不区分大小写地查找
-        return columnList.stream().map(String::toLowerCase).collect(Collectors.toSet());
+        StringBuilder sb = new StringBuilder();
+        sb.append("`").append(columnName).append("` ");
+
+        String dataType = getDataType(field);
+        sb.append(dataType);
+
+        // 主键处理
+        TableId tableId = field.getAnnotation(TableId.class);
+        if (tableId != null) {
+            sb.append(" PRIMARY KEY");
+            if (tableId.type() == IdType.AUTO) {
+                sb.append(" AUTO_INCREMENT");
+            }
+        }
+
+        // 默认值处理（修复引号问题）
+        if (field.isAnnotationPresent(DefaultValue.class)) {
+            String val = field.getAnnotation(DefaultValue.class).value();
+            sb.append(" DEFAULT ").append(formatDefaultValue(field, val));
+        }
+
+        // 注释
+        if (field.isAnnotationPresent(ColumnComment.class)) {
+            sb.append(" COMMENT '").append(field.getAnnotation(ColumnComment.class).value()).append("'");
+        }
+
+        return sb.toString();
     }
 
     /**
-     * 批量获取一个表的所有索引名
+     * 格式化默认值：如果是字符串且不是SQL函数，自动加单引号
      */
+    private String formatDefaultValue(Field field, String value) {
+        if (value == null || value.equalsIgnoreCase("NULL")) return "NULL";
+
+        // 如果是常见的SQL函数，不加引号
+        if (value.toUpperCase().contains("(") || value.equalsIgnoreCase("CURRENT_TIMESTAMP")) {
+            return value;
+        }
+
+        Class<?> type = field.getType();
+        if (type == String.class || type == LocalDateTime.class) {
+            if (!value.startsWith("'")) {
+                return "'" + value + "'";
+            }
+        }
+        return value;
+    }
+
+    private String getColumnName(Field field) {
+        TableId tableId = field.getAnnotation(TableId.class);
+        if (tableId != null) {
+            return tableId.value().isEmpty() ? field.getName() : tableId.value();
+        }
+        TableField tableField = field.getAnnotation(TableField.class);
+        if (tableField != null && tableField.exist()) {
+            return tableField.value().isEmpty() ? field.getName() : tableField.value();
+        }
+        // 如果没有任何注解，Mybatis-Plus 默认也是映射的，但为安全起见，此处逻辑要求显式注解或根据需求调整
+        return null;
+    }
+
+    private boolean tableExists(String tableName) {
+        String sql = "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, tableName);
+        return count != null && count > 0;
+    }
+
+    private Map<String, String> getExistingColumnsInfo(String tableName) {
+        String sql = "SELECT COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
+        Map<String, String> map = new HashMap<>();
+        jdbcTemplate.query(sql, (rs) -> {
+            map.put(rs.getString("COLUMN_NAME").toLowerCase(), rs.getString("COLUMN_TYPE"));
+        }, tableName);
+        return map;
+    }
+
     private Set<String> getExistingIndexNames(String tableName) {
-        // 排除主键索引 (PRIMARY)
         String sql = "SELECT DISTINCT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME != 'PRIMARY'";
-        List<String> indexList = jdbcTemplate.queryForList(sql, String.class, tableName);
-        return indexList.stream().map(String::toLowerCase).collect(Collectors.toSet());
+        List<String> list = jdbcTemplate.queryForList(sql, String.class, tableName);
+        return list.stream().map(String::toLowerCase).collect(Collectors.toSet());
     }
 
-    /**
-     * 批量获取一个表的所有外键约束名
-     */
     private Set<String> getExistingForeignKeyNames(String tableName) {
         String sql = "SELECT CONSTRAINT_NAME FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_TYPE = 'FOREIGN KEY'";
-        List<String> fkList = jdbcTemplate.queryForList(sql, String.class, tableName);
-        return fkList.stream().map(String::toLowerCase).collect(Collectors.toSet());
-    }
-    private boolean columnExists(String tableName, String columnName) throws SQLException {
-        // 使用 try-with-resources 自动关闭连接，修复潜在的连接泄露风险
-        try (Connection connection = jdbcTemplate.getDataSource().getConnection()) {
-            DatabaseMetaData metaData = connection.getMetaData();
-            try (ResultSet rs = metaData.getColumns(null, null, tableName, columnName)) {
-                return rs.next();
-            }
-        } catch (Exception e) {
-            log.error("检查表 {} 中的列 {} 是否存在时发生错误: {}", tableName, columnName, e.getMessage());
-            throw e;
-        }
+        List<String> list = jdbcTemplate.queryForList(sql, String.class, tableName);
+        return list.stream().map(String::toLowerCase).collect(Collectors.toSet());
     }
 
-    // 检查索引是否存在
-    private boolean indexExists(String tableName, String indexName) {
-        try {
-            // 使用 information_schema 查询，更通用和准确
-            // DATABASE() 是 MySQL/MariaDB 的函数，用于获取当前数据库名
-            String sql = "SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?";
-            Integer count = jdbcTemplate.queryForObject(sql, Integer.class, tableName, indexName);
-            return count != null && count > 0;
-        } catch (Exception e) {
-            log.error("检查表 {} 中的索引 {} 是否存在时发生错误: {}", tableName, indexName, e.getMessage());
-            // 发生错误时，保守地返回true，避免重复创建导致失败
-            return true;
-        }
-    }
-
-    private String getDefaultValueSql(Field field) {
-        if (field.isAnnotationPresent(DefaultValue.class)) {
-            DefaultValue defaultValueAnnotation = field.getAnnotation(DefaultValue.class);
-            return " DEFAULT " + defaultValueAnnotation.value();
-        }
-        return "";
-    }
-
-    // 从注解获取字段注释SQL
-    private String getColumnCommentSql(Field field) {
-        if (field.isAnnotationPresent(ColumnComment.class)) {
-            return " COMMENT '" + field.getAnnotation(ColumnComment.class).value() + "'";
-        }
-        return "";
-    }
-
-    // 从注解获取表注释SQL
     private String getTableCommentSql(Class<?> entityClass) {
         if (entityClass.isAnnotationPresent(TableComment.class)) {
             return " COMMENT='" + entityClass.getAnnotation(TableComment.class).value() + "'";
@@ -295,139 +279,73 @@ public class DatabaseInitService {
         return "";
     }
 
-    // 从注解获取所有索引定义SQL（用于CREATE TABLE）
     private List<String> getIndexDefinitionsSQL(Class<?> entityClass) {
-        List<String> definitions = new ArrayList<>();
-        // getAnnotationsByType 可以直接获取所有重复的注解，无需关心容器注解
         Index[] indexes = entityClass.getAnnotationsByType(Index.class);
-        for (Index index : indexes) {
-            definitions.add(buildIndexDefinition(index));
-        }
-        return definitions;
+        return Arrays.stream(indexes).map(this::buildIndexDefinition).collect(Collectors.toList());
     }
 
-    // 构建单条索引定义的SQL字符串
     private String buildIndexDefinition(Index index) {
         StringBuilder sb = new StringBuilder();
         switch (index.type()) {
-            case UNIQUE:
-                sb.append("UNIQUE KEY ");
-                break;
-            case FULLTEXT:
-                sb.append("FULLTEXT KEY ");
-                break;
-            default: // NORMAL
-                sb.append("KEY ");
-                break;
+            case UNIQUE -> sb.append("UNIQUE KEY ");
+            case FULLTEXT -> sb.append("FULLTEXT KEY ");
+            default -> sb.append("KEY ");
         }
-        // 拼接索引名和字段
-        sb.append("`").append(index.name()).append("`");
-        sb.append(" (")
-                .append("`").append(String.join("`,`", index.columns())).append("`")
-                .append(")");
-        // 添加索引方法 (例如 USING BTREE)
-        sb.append(" USING BTREE");
-        // 添加索引注释
-        if (index.comment() != null && !index.comment().isEmpty()) {
+        sb.append("`").append(index.name()).append("` ");
+        sb.append("(`").append(String.join("`,`", index.columns())).append("`) ");
+        sb.append("USING BTREE");
+        if (!index.comment().isEmpty()) {
             sb.append(" COMMENT '").append(index.comment()).append("'");
         }
         return sb.toString();
     }
 
-
     private String getDataType(Field field) {
         if (field.isAnnotationPresent(ColumnType.class)) {
-            ColumnType columnType = field.getAnnotation(ColumnType.class);
-            return columnType.value();
+            return field.getAnnotation(ColumnType.class).value();
         }
         Class<?> fieldType = field.getType();
-        if (fieldType.equals(String.class)) { return "VARCHAR(255)"; }
-        else if (fieldType.equals(LocalDateTime.class)) { return "DATETIME"; }
-        else if (fieldType.equals(Long.class) || fieldType.equals(long.class)) { return "BIGINT"; }
-        else if (fieldType.equals(Integer.class) || fieldType.equals(int.class)) { return "INT"; }
-        else if (fieldType.equals(Double.class) || fieldType.equals(double.class)) { return "DOUBLE"; }
-        else if (fieldType.equals(Float.class) || fieldType.equals(float.class)) { return "FLOAT"; }
-        else if (fieldType.equals(Boolean.class) || fieldType.equals(boolean.class)) { return "TINYINT(1)"; }
-        else if (fieldType.equals(Date.class)) { return "DATETIME"; }
-        else if (fieldType.equals(java.sql.Timestamp.class)) { return "TIMESTAMP"; }
-        else if (fieldType.equals(BigDecimal.class)) { return "DECIMAL(19,2)"; }
-        else if (fieldType.equals(Byte.class) || fieldType.equals(byte.class)) { return "TINYINT"; }
-        else if (fieldType.equals(Short.class) || fieldType.equals(short.class)) { return "SMALLINT"; }
-        else if (Collection.class.isAssignableFrom(fieldType)) { return "JSON"; }
-        else if (Map.class.isAssignableFrom(fieldType)) { return "JSON"; }
-        else { return "VARCHAR(255)"; }
+        if (fieldType.equals(String.class)) return "varchar(255)";
+        if (fieldType.equals(LocalDateTime.class)) return "datetime";
+        if (fieldType.equals(Long.class) || fieldType.equals(long.class)) return "bigint";
+        if (fieldType.equals(Integer.class) || fieldType.equals(int.class)) return "int";
+        if (fieldType.equals(Double.class) || fieldType.equals(double.class)) return "double";
+        if (fieldType.equals(Boolean.class) || fieldType.equals(boolean.class)) return "tinyint(1)";
+        if (fieldType.equals(BigDecimal.class)) return "decimal(19,2)";
+        if (Collection.class.isAssignableFrom(fieldType) || Map.class.isAssignableFrom(fieldType)) return "json";
+        return "varchar(255)";
     }
 
-
-    // 辅助方法
-
-    /**
-     * 检查外键是否存在
-     */
-    private boolean foreignKeyExists(String tableName, String fkName) {
-        try {
-            String sql = "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_NAME = ? AND CONSTRAINT_TYPE = 'FOREIGN KEY'";
-            Integer count = jdbcTemplate.queryForObject(sql, Integer.class, tableName, fkName);
-            return count != null && count > 0;
-        } catch (Exception e) {
-            System.err.println("Error checking if foreign key " + fkName + " exists in table " + tableName + ": " + e.getMessage());
-            return true; // 保守返回true，避免重复创建
+    private String buildForeignKeyDefinition(ForeignKey fk) {
+        if (fk.columns().length != fk.referencedColumns().length) {
+            throw new IllegalArgumentException("外键定义错误: columns 与 referencedColumns 长度不一致 [" + fk.name() + "]");
         }
-    }
-
-    /**
-     * 从注解获取所有外键定义SQL（用于CREATE TABLE）
-     */
-    private List<String> getForeignKeyDefinitionsSQL(Class<?> entityClass) {
-        List<String> definitions = new ArrayList<>();
-        ForeignKey[] foreignKeys = entityClass.getAnnotationsByType(ForeignKey.class);
-        for (ForeignKey fk : foreignKeys) {
-            definitions.add(buildForeignKeyDefinition(fk));
+        TableName refAnn = fk.referenceEntity().getAnnotation(TableName.class);
+        if (refAnn == null) {
+            throw new IllegalArgumentException("外键引用实体 " + fk.referenceEntity().getSimpleName() + " 缺失 @TableName");
         }
-        return definitions;
+
+        String columnsSql = "`" + String.join("`,`", fk.columns()) + "`";
+        String refColumnsSql = "`" + String.join("`,`", fk.referencedColumns()) + "`";
+        String onDelete = "ON DELETE " + fk.onDelete().name().replace('_', ' ');
+        String onUpdate = "ON UPDATE " + fk.onUpdate().name().replace('_', ' ');
+
+        return String.format("CONSTRAINT `%s` FOREIGN KEY (%s) REFERENCES `%s` (%s) %s %s",
+                fk.name(), columnsSql, refAnn.value(), refColumnsSql, onDelete, onUpdate);
     }
 
-    /**
-     * 递归获取一个类及其所有父类的所有字段
-     *
-     * @param clazz 要获取字段的类
-     * @return 包含所有字段的列表
-     */
     private List<Field> getAllFields(Class<?> clazz) {
         List<Field> fields = new ArrayList<>();
-        // 当父类为 null 或 Object.class 时停止
         while (clazz != null && !clazz.equals(Object.class)) {
-            // 将当前类的所有声明字段添加到列表中
             fields.addAll(Arrays.asList(clazz.getDeclaredFields()));
-            // 获取父类，继续下一次循环
             clazz = clazz.getSuperclass();
         }
         return fields;
     }
 
-    /**
-     * 构建单条外键定义的SQL字符串
-     */
-    private String buildForeignKeyDefinition(ForeignKey fk) {
-        // 获取引用的表名
-        TableName referencedTableNameAnn = fk.referenceEntity().getAnnotation(TableName.class);
-        if (referencedTableNameAnn == null) {
-            throw new IllegalArgumentException("The referenceEntity " + fk.referenceEntity().getSimpleName() + " must have a @TableName annotation.");
-        }
-        String referencedTableName = referencedTableNameAnn.value();
-        String columnsSql = "`" + String.join("`,`", fk.columns()) + "`";
-        String referencedColumnsSql = "`" + String.join("`,`", fk.referencedColumns()) + "`";
-        // ON DELETE 和 ON UPDATE 的SQL片段
-        String onDeleteSql = "ON DELETE " + fk.onDelete().name().replace('_', ' ');
-        String onUpdateSql = "ON UPDATE " + fk.onUpdate().name().replace('_', ' ');
-        return String.format("CONSTRAINT `%s` FOREIGN KEY (%s) REFERENCES `%s` (%s) %s %s",
-                fk.name(),
-                columnsSql,
-                referencedTableName,
-                referencedColumnsSql,
-                onDeleteSql,
-                onUpdateSql
-        );
+    private boolean isIgnoreField(Field field) {
+        return Modifier.isStatic(field.getModifiers())
+                || Modifier.isTransient(field.getModifiers())
+                || "serialVersionUID".equals(field.getName());
     }
-
 }
