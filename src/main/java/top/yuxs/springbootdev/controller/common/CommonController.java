@@ -1,7 +1,10 @@
 package top.yuxs.springbootdev.controller.common;
 
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.type.filter.AssignableTypeFilter;
 import org.springframework.util.ClassUtils;
@@ -13,70 +16,108 @@ import top.yuxs.springbootdev.common.Result;
 
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 公共接口 -- 枚举
- *
+ * 公共接口 -- 枚举 (自动化扫描版)
  */
 @Slf4j
 @RestController
 @RequestMapping("/api/common")
 public class CommonController {
 
-    // 枚举类所在的根包名
-    private final String ENUM_PACKAGE = "com.wzz.gspt.enums";
+    private final ApplicationContext applicationContext;
 
-    /**
-     * 1. 一次性返回所有枚举类
-     * 返回的枚举类的类名为驼峰命名
-     */
-    @GetMapping("/enums/all")
-    public Result<Map<String, List<Map<String, Object>>>> getAllEnums() {
-        Map<String, List<Map<String, Object>>> result = new HashMap<>();
+    // 缓存所有枚举的 JSON 结果
+    private final Map<String, List<Map<String, Object>>> allEnumsCache = new ConcurrentHashMap<>();
+    // 缓存枚举类名与 Class 的映射，方便单查
+    private final Map<String, Class<?>> enumClassCache = new ConcurrentHashMap<>();
 
-        // 扫描指定包下的所有类
-        ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(false);
-        // 接受所有类，后续判断是否为枚举
-        scanner.addIncludeFilter(new AssignableTypeFilter(Object.class));
-
-        Set<BeanDefinition> components = scanner.findCandidateComponents(ENUM_PACKAGE);
-        for (BeanDefinition component : components) {
-            try {
-                Class<?> clazz = ClassUtils.forName(Objects.requireNonNull(component.getBeanClassName()), ClassUtils.getDefaultClassLoader());
-                if (clazz.isEnum()) {
-                    // 驼峰命名作为 Key
-                    String key = Character.toLowerCase(clazz.getSimpleName().charAt(0)) + clazz.getSimpleName().substring(1);
-                    result.put(key, reflectEnumToList(clazz));
-                }
-            } catch (Exception e) {
-                log.error("扫描枚举 [{}] 失败", component.getBeanClassName(), e);
-            }
-        }
-        return Result.success(result);
+    public CommonController(ApplicationContext applicationContext) {
+        this.applicationContext = applicationContext;
     }
 
     /**
-     * 2. 指定类名返回枚举
+     * 项目启动时执行一次，自动扫描项目包下所有的枚举并缓存
+     */
+    @PostConstruct
+    public void initEnumCache() {
+        // 1. 动态获取 Spring Boot 启动类所在的根包名
+        String basePackage = getProjectBasePackage();
+        log.info("开始扫描全局枚举，根包路径: {}", basePackage);
+
+        // 2. 初始化扫描器，false 表示不使用默认的 @Component 过滤
+        ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(false);
+        // 优化：直接过滤出 Enum 类型，而不是 Object，极大提升扫描速度
+        scanner.addIncludeFilter(new AssignableTypeFilter(Enum.class));
+
+        Set<BeanDefinition> components = scanner.findCandidateComponents(basePackage);
+
+        for (BeanDefinition component : components) {
+            String className = component.getBeanClassName();
+            try {
+                Class<?> clazz = ClassUtils.forName(Objects.requireNonNull(className), ClassUtils.getDefaultClassLoader());
+                if (clazz.isEnum()) {
+                    String simpleName = clazz.getSimpleName();
+                    // 驼峰命名作为 Key
+                    String key = Character.toLowerCase(simpleName.charAt(0)) + simpleName.substring(1);
+
+                    // 存入缓存
+                    allEnumsCache.put(key, reflectEnumToList(clazz));
+                    enumClassCache.put(simpleName, clazz);
+                }
+            } catch (Exception e) {
+                log.error("解析枚举类 [{}] 失败", className, e);
+            }
+        }
+        log.info("全局枚举扫描完成，共加载 {} 个枚举类", enumClassCache.size());
+    }
+
+    /**
+     * 1. 一次性返回所有枚举类 (直接读缓存，毫秒级响应)
+     */
+    @GetMapping("/enums/all")
+    public Result<Map<String, List<Map<String, Object>>>> getAllEnums() {
+        return Result.success(allEnumsCache);
+    }
+
+    /**
+     * 2. 指定类名返回枚举 (直接读缓存，毫秒级响应)
      * 示例: /api/common/enums/ResultCode
      */
     @GetMapping("/enums/{enumName}")
     public Result<?> getEnumByName(@PathVariable String enumName) {
-        try {
-            Class<?> clazz = findEnumClass(enumName);
-            if (clazz != null) {
+        Class<?> clazz = enumClassCache.get(enumName);
+        if (clazz != null) {
+            try {
                 return Result.success(reflectEnumToList(clazz));
+            } catch (Exception e) {
+                log.error("获取枚举失败: {}", enumName, e);
+                return Result.error(2001, "获取枚举失败");
             }
-            return Result.error(2001, "未找到枚举类: " + enumName);
-        } catch (Exception e) {
-            return Result.error(2001, "获取枚举失败");
         }
+        return Result.error(2001, "未找到枚举类: " + enumName);
     }
 
     // --- 工具方法 ---
 
     /**
+     * 动态获取项目启动类所在的根包
+     */
+    private String getProjectBasePackage() {
+        Map<String, Object> annotatedBeans = applicationContext.getBeansWithAnnotation(SpringBootApplication.class);
+        if (!annotatedBeans.isEmpty()) {
+            // 获取带 @SpringBootApplication 的类所在的包名
+            return annotatedBeans.values().iterator().next().getClass().getPackage().getName();
+        }
+        // 如果实在获取不到（极少情况），退化为当前 Controller 所在的顶级包（如 top.yuxs）
+        String[] packages = this.getClass().getPackage().getName().split("\\.");
+        return packages.length >= 2 ? packages[0] + "." + packages[1] : packages[0];
+    }
+
+    /**
      * 使用反射将枚举转为 List<Map>
-     * 自动兼容 getCode/getValue 和 getMessage/getDesc/getDesc
+     * 自动兼容 getCode/getValue 和 getMessage/getDesc/getDescription
      */
     private List<Map<String, Object>> reflectEnumToList(Class<?> clazz) throws Exception {
         List<Map<String, Object>> list = new ArrayList<>();
@@ -107,20 +148,6 @@ public class CommonController {
             try {
                 return clazz.getMethod(name);
             } catch (NoSuchMethodException ignored) {}
-        }
-        return null;
-    }
-
-    private Class<?> findEnumClass(String simpleName) {
-        ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(false);
-        scanner.addIncludeFilter(new AssignableTypeFilter(Object.class));
-        Set<BeanDefinition> components = scanner.findCandidateComponents(ENUM_PACKAGE);
-        for (BeanDefinition component : components) {
-            if (component.getBeanClassName().endsWith("." + simpleName)) {
-                try {
-                    return ClassUtils.forName(component.getBeanClassName(), ClassUtils.getDefaultClassLoader());
-                } catch (ClassNotFoundException ignored) {}
-            }
         }
         return null;
     }
