@@ -37,6 +37,9 @@ public class DatabaseInitService {
     @Value("${db.init.base-package}")
     private String basePackage;
 
+    @Value("${db.init.init-data:false}")
+    private boolean initDataEnabled;
+
     /**
      * 初始化入口
      */
@@ -60,7 +63,75 @@ public class DatabaseInitService {
                 syncForeignKeys(entityClass, tableNameAnnotation.value());
             }
         }
+
+        // 第三阶段：初始化默认数据
+        if (initDataEnabled) {
+            initDefaultData(entityClasses);
+        }
+
         log.info("数据库初始化完成");
+    }
+
+    /**
+     * 初始化默认数据
+     */
+    private void initDefaultData(List<Class<?>> entityClasses) {
+        log.info("开始检查并初始化默认数据...");
+        for (Class<?> entityClass : entityClasses) {
+            TableName tableNameAnnotation = entityClass.getAnnotation(TableName.class);
+            if (tableNameAnnotation == null) continue;
+
+            String tableName = tableNameAnnotation.value();
+            if (isTableEmpty(tableName)) {
+                insertDefaultData(entityClass, tableName);
+            }
+        }
+    }
+
+    private boolean isTableEmpty(String tableName) {
+        try {
+            Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM `" + tableName + "`", Integer.class);
+            return count != null && count == 0;
+        } catch (Exception e) {
+            log.warn("检查表 {} 是否为空时出错: {}", tableName, e.getMessage());
+            return false;
+        }
+    }
+
+    private void insertDefaultData(Class<?> entityClass, String tableName) {
+        List<Field> fields = getAllFields(entityClass);
+        Map<String, Object> defaultValues = new LinkedHashMap<>();
+
+        for (Field field : fields) {
+            if (isIgnoreField(field)) continue;
+            DefaultData defaultData = field.getAnnotation(DefaultData.class);
+            if (defaultData != null) {
+                String columnName = getColumnName(field);
+                if (columnName != null) {
+                    defaultValues.put(columnName, defaultData.value());
+                }
+            }
+        }
+
+        if (defaultValues.isEmpty()) return;
+
+        StringBuilder sql = new StringBuilder("INSERT INTO `").append(tableName).append("` (");
+        StringBuilder placeholders = new StringBuilder();
+
+        List<String> columns = new ArrayList<>(defaultValues.keySet());
+        for (int i = 0; i < columns.size(); i++) {
+            sql.append("`").append(columns.get(i)).append("`").append(i == columns.size() - 1 ? "" : ", ");
+            placeholders.append("?").append(i == columns.size() - 1 ? "" : ", ");
+        }
+
+        sql.append(") VALUES (").append(placeholders).append(");");
+
+        try {
+            log.info("表 {} 插入默认数据: {}", tableName, defaultValues);
+            jdbcTemplate.update(sql.toString(), defaultValues.values().toArray());
+        } catch (Exception e) {
+            log.error("表 {} 插入默认数据失败: {}", tableName, e.getMessage());
+        }
     }
 
     private List<Class<?>> scanEntityClasses(String basePackage) {

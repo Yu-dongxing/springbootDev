@@ -125,6 +125,8 @@ db:
     enabled: true
     # 自动建表/更新表时扫描实体的基础包名
     base-package: top.yuxs.springbootdev.entity
+    # 是否初始化默认数据
+    init-data: true
 
 # 自定义文件上传配置
 file:
