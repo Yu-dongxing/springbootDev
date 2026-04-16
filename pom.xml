@@ -14,7 +14,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.3</version>
+        <version>4.0.5</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
@@ -44,9 +44,9 @@
         <!-- 指定 Java 版本为 21 -->
         <java.version>21</java.version>
         <!-- MyBatis-Plus 版本 -->
-        <mybatis-plus.version>3.5.10.1</mybatis-plus.version>
+        <mybatis-plus.version>3.5.16</mybatis-plus.version>
         <!-- Sa-Token 版本 -->
-        <sa-token.version>1.44.0</sa-token.version>
+        <sa-token.version>1.45.0</sa-token.version>
         <!-- Hutool 工具包版本 -->
         <hutool.version>5.8.40</hutool.version>
         <!-- Fastjson2 版本  -->
@@ -133,7 +133,7 @@
         <!-- 注：此处移除了老的 mybatis-spring-boot-starter，因为 MP 已包含，避免冲突 -->
         <dependency>
             <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-boot-starter</artifactId>
+            <artifactId>mybatis-plus-spring-boot4-starter</artifactId>
             <version>${mybatis-plus.version}</version>
         </dependency>
 

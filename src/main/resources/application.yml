@@ -83,7 +83,7 @@ mybatis-plus:
   # XML 映射文件位置
   mapper-locations: classpath*:/mapper/**/*.xml
   # 实体类所在包（配置后 XML 中可以直接写类名，不用写全路径）
-  type-aliases-package: top.yuxs.springbootDev.entity
+  type-aliases-package: top.yuxs.springbootdev.entity
   configuration:
     # 开启驼峰命名自动映射 (如数据库 user_name 会自动映射到 Java 的 userName)
     map-underscore-to-camel-case: true
@@ -131,9 +131,17 @@ db:
 
 # 自定义文件上传配置
 file:
-  # 本地存储路径（Windows 示例，注意最后的斜杠）
-  # 如果是 Linux，请修改为 /var/www/uploads/
-  # ./ 代表 JAR 包运行时的当前目录
-  upload-path: ./uploads/
-  # Web 访问前缀
-  access-path: /uploads/**
+  # 必须与 StorageType 枚举完全一致: LOCAL, ALIYUN_OSS
+  active: LOCAL
+
+  local:
+    domain: http://localhost:8080
+    upload-path: ./uploads/
+    access-path: /uploads/**
+
+  aliyun:
+    domain: https://cdn.example.com
+    endpoint: oss-cn-hangzhou.aliyuncs.com
+    bucket-name: my-bucket
+    access-key: xxxx
+    secret-key: xxxx

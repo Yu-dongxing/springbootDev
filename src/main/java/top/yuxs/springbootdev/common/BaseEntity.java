@@ -23,10 +23,10 @@ import java.time.LocalDateTime;
 public abstract class BaseEntity implements Serializable {
 
     /**
-     * 主键id(自增id)
+     * 主键id(雪花算法id)
      */
     @ColumnComment("主键ID")
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     /**
