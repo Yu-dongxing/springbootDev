@@ -1,5 +1,6 @@
 server:
   port: 8080
+  forward-headers-strategy: framework
   # Tomcat 虚拟线程配置（如果在 WebFlux 下该配置不生效，如果在传统 Web 下生效）
   tomcat:
     # 最大连接数：Tomcat 允许接收和处理的最大并发连接数 (默认 8192，高并发场景可适当调大)

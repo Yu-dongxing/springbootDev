@@ -8,6 +8,7 @@
 package top.yuxs.springbootdev.controller.common;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import top.yuxs.springbootdev.common.Result;
+import top.yuxs.springbootdev.utils.IpUtils;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -104,6 +106,19 @@ public class CommonController {
             }
         }
         return Result.error(2001, "未找到枚举类: " + enumName);
+    }
+
+    /**
+     * 获取客户端真实 IP，支持代理转发场景。
+     */
+    @GetMapping("/client-ip")
+    public Result<Map<String, Object>> getClientIp(HttpServletRequest request) {
+        IpUtils.IpResolveResult ipResolveResult = IpUtils.resolveClientIp(request);
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.putAll(ipResolveResult.toMap());
+        data.put("headers", IpUtils.collectIpHeaders(request));
+        return Result.success(data);
     }
 
     // --- 工具方法 ---
