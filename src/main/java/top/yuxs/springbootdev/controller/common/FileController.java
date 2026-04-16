@@ -5,22 +5,23 @@
  * @since 2026/04/16
  */
 
-package top.yuxs.springbootdev.controller;
+package top.yuxs.springbootdev.controller.common;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import top.yuxs.springbootdev.common.Result;
-import top.yuxs.springbootdev.config.FileProperties;
+import top.yuxs.springbootdev.config.file.FileProperties;
 import top.yuxs.springbootdev.entity.SysFile;
-import top.yuxs.springbootdev.service.FileContextService;
-import top.yuxs.springbootdev.service.SysFileService;
+import top.yuxs.springbootdev.service.file.FileContextService;
+import top.yuxs.springbootdev.service.file.SysFileService;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 公共接口 - 文件管理接口
+ * 公共接口 -- 文件管理接口
+ * 上传/查询（根据id）/获取上传配置详细
  *
  * @author YuDongXing
  * @since 2026/04/16

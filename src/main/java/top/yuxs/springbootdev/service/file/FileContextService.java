@@ -5,7 +5,7 @@
  * @since 2026/04/16
  */
 
-package top.yuxs.springbootdev.service;
+package top.yuxs.springbootdev.service.file;
 
 import cn.hutool.crypto.digest.DigestUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,8 +19,8 @@ import org.springframework.web.multipart.MultipartFile;
 import top.yuxs.springbootdev.entity.SysFile;
 import top.yuxs.springbootdev.enums.db.StorageType;
 import top.yuxs.springbootdev.exception.BusinessException;
-import top.yuxs.springbootdev.service.storage.StorageFactory;
-import top.yuxs.springbootdev.service.storage.StorageService;
+import top.yuxs.springbootdev.service.file.impl.storage.StorageFactory;
+import top.yuxs.springbootdev.service.file.impl.storage.StorageService;
 import top.yuxs.springbootdev.utils.IpUtils;
 
 import java.io.IOException;

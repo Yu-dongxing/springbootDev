@@ -5,7 +5,7 @@
  * @since 2026/04/16
  */
 
-package top.yuxs.springbootdev.service;
+package top.yuxs.springbootdev.service.file;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import top.yuxs.springbootdev.entity.SysFile;

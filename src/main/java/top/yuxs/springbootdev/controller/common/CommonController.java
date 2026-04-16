@@ -28,7 +28,8 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 公共接口 -- 枚举 (自动化扫描版)
+ * 公共接口 -- 枚举
+ * 获取所有枚举/根据类名返回枚举
  */
 @Slf4j
 @RestController
@@ -83,7 +84,7 @@ public class CommonController {
     }
 
     /**
-     * 1. 一次性返回所有枚举类 (直接读缓存，毫秒级响应)
+     * 一次性返回所有枚举类
      */
     @GetMapping("/enums/all")
     public Result<Map<String, List<Map<String, Object>>>> getAllEnums() {
@@ -91,7 +92,7 @@ public class CommonController {
     }
 
     /**
-     * 2. 指定类名返回枚举 (直接读缓存，毫秒级响应)
+     * 指定类名返回枚举
      * 示例: /api/common/enums/ResultCode
      */
     @GetMapping("/enums/{enumName}")
@@ -108,18 +109,7 @@ public class CommonController {
         return Result.error(2001, "未找到枚举类: " + enumName);
     }
 
-    /**
-     * 获取客户端真实 IP，支持代理转发场景。
-     */
-    @GetMapping("/client-ip")
-    public Result<Map<String, Object>> getClientIp(HttpServletRequest request) {
-        IpUtils.IpResolveResult ipResolveResult = IpUtils.resolveClientIp(request);
 
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.putAll(ipResolveResult.toMap());
-        data.put("headers", IpUtils.collectIpHeaders(request));
-        return Result.success(data);
-    }
 
     // --- 工具方法 ---
 

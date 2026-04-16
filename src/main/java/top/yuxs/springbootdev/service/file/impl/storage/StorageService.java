@@ -5,7 +5,7 @@
  * @since 2026/04/16
  */
 
-package top.yuxs.springbootdev.service.storage;
+package top.yuxs.springbootdev.service.file.impl.storage;
 
 import org.springframework.web.multipart.MultipartFile;
 import top.yuxs.springbootdev.enums.db.StorageType;

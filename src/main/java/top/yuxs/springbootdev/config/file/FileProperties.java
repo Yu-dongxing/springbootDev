@@ -5,7 +5,7 @@
  * @since 2026/04/16
  */
 
-package top.yuxs.springbootdev.config;
+package top.yuxs.springbootdev.config.file;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

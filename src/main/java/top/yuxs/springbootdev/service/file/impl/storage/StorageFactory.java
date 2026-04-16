@@ -5,12 +5,12 @@
  * @since 2026/04/16
  */
 
-package top.yuxs.springbootdev.service.storage;
+package top.yuxs.springbootdev.service.file.impl.storage;
 
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import top.yuxs.springbootdev.config.FileProperties;
+import top.yuxs.springbootdev.config.file.FileProperties;
 import top.yuxs.springbootdev.enums.db.StorageType;
 import top.yuxs.springbootdev.exception.BusinessException;
 

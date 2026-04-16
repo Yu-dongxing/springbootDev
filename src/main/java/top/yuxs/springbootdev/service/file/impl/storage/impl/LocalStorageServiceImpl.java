@@ -5,16 +5,16 @@
  * @since 2026/04/16
  */
 
-package top.yuxs.springbootdev.service.storage.impl;
+package top.yuxs.springbootdev.service.file.impl.storage.impl;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import top.yuxs.springbootdev.config.FileProperties;
+import top.yuxs.springbootdev.config.file.FileProperties;
 import top.yuxs.springbootdev.enums.db.StorageType;
 import top.yuxs.springbootdev.exception.BusinessException;
-import top.yuxs.springbootdev.service.storage.StorageService;
+import top.yuxs.springbootdev.service.file.impl.storage.StorageService;
 
 import java.io.IOException;
 import java.nio.file.Files;
