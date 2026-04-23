@@ -7,11 +7,11 @@
 
 package top.yuxs.springbootdev.config;
 
+import com.fasterxml.jackson.databind.Module;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
-import org.springframework.boot.autoconfigure.jackson.Jackson2ObjectMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 
 import java.math.BigInteger;
 
@@ -23,12 +23,12 @@ import java.math.BigInteger;
 public class JacksonConfig {
 
     @Bean
-    public Jackson2ObjectMapperBuilderCustomizer jackson2ObjectMapperBuilderCustomizer() {
-        return builder -> {
-            // 将 Long 和 BigInteger 类型在序列化时自动转为 String 类型
-            builder.serializerByType(Long.class, ToStringSerializer.instance);
-            builder.serializerByType(Long.TYPE, ToStringSerializer.instance);
-            builder.serializerByType(BigInteger.class, ToStringSerializer.instance);
-        };
+    public Module jacksonModule() {
+        SimpleModule module = new SimpleModule();
+        // 将 Long 和 BigInteger 类型在序列化时自动转为 String 类型
+        module.addSerializer(Long.class, ToStringSerializer.instance);
+        module.addSerializer(Long.TYPE, ToStringSerializer.instance);
+        module.addSerializer(BigInteger.class, ToStringSerializer.instance);
+        return module;
     }
 }
