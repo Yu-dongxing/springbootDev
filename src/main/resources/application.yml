@@ -115,6 +115,14 @@ sa-token:
   token-style: uuid
   # 是否输出操作日志
   is-log: false
+  # 防火墙配置
+  firewall:
+    # 是否开启危险字符检查 (默认 true，拦截 %2e, %2f, .. 等)
+    check-path-character: true
+    # 是否开启目录遍历符检查 (默认 true)
+    check-directory-traversal: true
+    # 允许的请求方式
+    allowed-method: GET, POST, PUT, DELETE
 
 # 自定义业务配置
 # =========================================================

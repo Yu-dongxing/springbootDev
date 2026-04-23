@@ -8,6 +8,7 @@
 package top.yuxs.springbootdev.exception;
 
 
+import cn.dev33.satoken.exception.FirewallCheckException;
 import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.exception.SaTokenException;
 import lombok.extern.slf4j.Slf4j;
@@ -141,6 +142,16 @@ public class GlobalExceptionHandler {
             return Result.error(ResultCode.TOKEN_BE_REPLACED);
         }
         return Result.error(ResultCode.USER_NOT_LOGGED_IN);
+    }
+
+    /**
+     * 防火墙校验异常 (Sa-Token Firewall)
+     */
+    @ExceptionHandler(FirewallCheckException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public Result<?> handleFirewallCheckException(FirewallCheckException e) {
+        log.error("防火墙拦截: {}", e.getMessage());
+        return Result.error(ResultCode.FORBIDDEN.getCode(), "请求被防火墙拦截: " + e.getMessage());
     }
 
     /**

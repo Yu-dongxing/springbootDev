@@ -8,6 +8,7 @@
 package top.yuxs.springbootdev.enums;
 
 
+import cn.dev33.satoken.util.SaResult;
 import lombok.Getter;
 
 @Getter
@@ -32,6 +33,7 @@ public enum ResultCode {
     TOKEN_FREEZE(1007, "Token已被冻结"),
     NO_PERMISSION(1008, "无权限，请联系管理员"),
     NO_ROLE(1009, "无此角色权限"),
+    FORBIDDEN(1010,"防火墙拦截"),
 
     /* 系统错误：5001 - 5999 */
     SYSTEM_INNER_ERROR(5001, "系统繁忙，未知错误，请稍后再试"),
