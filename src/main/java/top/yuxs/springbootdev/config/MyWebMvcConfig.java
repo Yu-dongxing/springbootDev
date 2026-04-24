@@ -39,14 +39,22 @@ public class MyWebMvcConfig implements WebMvcConfigurer {
             uploadPath += File.separator;
         }
 
-        // 获取绝对路径
+        // 获取绝对路径并转换为标准的 file 协议格式
         File file = new File(uploadPath);
-        String absolutePath = "file:" + file.getAbsolutePath();
-        if (!absolutePath.endsWith(File.separator) && !absolutePath.endsWith("/")) {
-            absolutePath += File.separator;
+        String absolutePath = file.getAbsolutePath();
+        
+        // 统一处理 Windows 和 Linux 路径格式，确保以 file:/// 开头
+        String protocolPrefix = "file:";
+        if (!absolutePath.startsWith("/")) {
+            protocolPrefix = "file:/";
+        }
+        
+        String resourceLocation = protocolPrefix + absolutePath.replace("\\", "/");
+        if (!resourceLocation.endsWith("/")) {
+            resourceLocation += "/";
         }
 
         registry.addResourceHandler(accessPath)
-                .addResourceLocations(absolutePath);
+                .addResourceLocations(resourceLocation);
     }
 }

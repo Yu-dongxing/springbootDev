@@ -30,6 +30,10 @@ public class StorageFactory {
     @Autowired
     private FileProperties fileProperties;
 
+    public FileProperties getFileProperties() {
+        return fileProperties;
+    }
+
     @Autowired
     private List<StorageService> storageServices;
 

@@ -312,15 +312,21 @@ public class DatabaseInitService {
 
     private String getColumnName(Field field) {
         TableId tableId = field.getAnnotation(TableId.class);
-        if (tableId != null) {
-            return tableId.value().isEmpty() ? field.getName() : tableId.value();
+        if (tableId != null && !tableId.value().isEmpty()) {
+            return tableId.value();
         }
         TableField tableField = field.getAnnotation(TableField.class);
-        if (tableField != null && tableField.exist()) {
-            return tableField.value().isEmpty() ? field.getName() : tableField.value();
+        if (tableField != null && !tableField.value().isEmpty()) {
+            return tableField.value();
         }
-        // 如果没有任何注解，Mybatis-Plus 默认也是映射的，但为安全起见，此处逻辑要求显式注解或根据需求调整
-        return null;
+        
+        // 如果是 TableField 且标记为不存在，则忽略
+        if (tableField != null && !tableField.exist()) {
+            return null;
+        }
+
+        // 默认逻辑：将驼峰转换为下划线
+        return cn.hutool.core.util.StrUtil.toUnderlineCase(field.getName());
     }
 
     private boolean tableExists(String tableName) {

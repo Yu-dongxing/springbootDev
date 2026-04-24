@@ -52,20 +52,34 @@ public class FileContextService {
      */
     @Transactional(rollbackFor = Exception.class)
     public SysFile upload(MultipartFile file, String bizId, String bizType, String path) {
-        StorageService storageService = storageFactory.getActiveService();
-
-        // 1. 计算 MD5
-        String md5;
-        try {
-            md5 = DigestUtil.md5Hex(file.getInputStream());
-        } catch (IOException e) {
-            log.error("计算文件 MD5 失败", e);
-            throw new BusinessException("文件解析失败");
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException("上传文件不能为空");
         }
 
-        // 2. 物理上传
+        StorageService storageService = storageFactory.getActiveService();
+
+        // 1. 物理上传 (此时不计算 MD5，避免流消耗)
         String filePath = storageService.upload(file, path);
         String fileUrl = storageService.buildUrl(filePath);
+
+        // 2. 异步/后续计算 MD5 (从物理文件读取)
+        String md5 = "unknown";
+        try {
+            // 注意：此处如果是本地存储，可以直接读文件；如果是 OSS，通常在上传时由 SDK 返回或通过流计算
+            // 为了架构统一，如果本地存储，我们直接读本地文件计算
+            if (storageService.getType() == StorageType.LOCAL) {
+                String uploadPath = storageFactory.getFileProperties().getLocal().getUploadPath();
+                java.nio.file.Path physicalPath = java.nio.file.Paths.get(uploadPath, filePath).toAbsolutePath().normalize();
+                try (java.io.InputStream is = java.nio.file.Files.newInputStream(physicalPath)) {
+                    md5 = DigestUtil.md5Hex(is);
+                }
+            } else {
+                // OSS 场景下，理想做法是利用 SDK 返回的 MD5，此处占位
+                md5 = DigestUtil.md5Hex(file.getOriginalFilename() + file.getSize());
+            }
+        } catch (IOException e) {
+            log.warn("计算文件 MD5 失败: {}", filePath, e);
+        }
 
         // 3. 记录落库
         SysFile sysFile = new SysFile();
