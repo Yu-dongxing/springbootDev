@@ -1,27 +1,20 @@
-2026-04-24 22:36:10.125 [main] INFO  top.yuxs.springbootdev.SpringbootDevApplication - Starting SpringbootDevApplication using Java 21.0.6 with PID 20944 (D:\CodeProject\DevelopmentProjects\springbootDev\target\classes started by 28310 in D:\CodeProject\DevelopmentProjects\springbootDev)
-2026-04-24 22:36:10.135 [main] INFO  top.yuxs.springbootdev.SpringbootDevApplication - No active profile set, falling back to 1 default profile: "default"
-2026-04-24 22:36:10.265 [background-preinit] INFO  org.hibernate.validator.internal.util.Version - HV000001: Hibernate Validator 9.0.1.Final
-2026-04-24 22:36:10.883 [main] INFO  org.springframework.data.repository.config.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
-2026-04-24 22:36:10.886 [main] INFO  org.springframework.data.repository.config.RepositoryConfigurationDelegate - Bootstrapping Spring Data Redis repositories in DEFAULT mode.
-2026-04-24 22:36:10.916 [main] INFO  org.springframework.data.repository.config.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 15 ms. Found 0 Redis repository interfaces.
-2026-04-24 22:36:11.447 [main] INFO  org.springframework.boot.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
-2026-04-24 22:36:11.458 [main] INFO  org.apache.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-8080"]
-2026-04-24 22:36:11.459 [main] INFO  org.apache.catalina.core.StandardService - Starting service [Tomcat]
-2026-04-24 22:36:11.459 [main] INFO  org.apache.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/11.0.20]
-2026-04-24 22:36:11.507 [main] INFO  org.springframework.boot.web.context.servlet.WebApplicationContextInitializer - Root WebApplicationContext: initialization completed in 1334 ms
-2026-04-24 22:36:11.691 [main] INFO  top.yuxs.springbootdev.controller.common.CommonController - 开始扫描全局枚举，根包路径: top.yuxs.springbootdev
-2026-04-24 22:36:11.716 [main] INFO  top.yuxs.springbootdev.controller.common.CommonController - 全局枚举扫描完成，共加载 4 个枚举类
-2026-04-24 22:36:12.495 [main] INFO  com.baomidou.mybatisplus.extension.spring.MybatisPlusApplicationContextAware - Register ApplicationContext instances org.springframework.boot.web.server.servlet.context.AnnotationConfigServletWebServerApplicationContext@e3cee7b
-2026-04-24 22:36:12.710 [main] INFO  org.springframework.boot.actuate.endpoint.web.EndpointLinksResolver - Exposing 1 endpoint beneath base path '/actuator'
-2026-04-24 22:36:12.763 [main] INFO  org.apache.coyote.http11.Http11NioProtocol - Starting ProtocolHandler ["http-nio-8080"]
-2026-04-24 22:36:12.784 [main] INFO  org.springframework.boot.tomcat.TomcatWebServer - Tomcat started on port 8080 (http) with context path '/'
-2026-04-24 22:36:12.791 [main] INFO  top.yuxs.springbootdev.SpringbootDevApplication - Started SpringbootDevApplication in 3.303 seconds (process running for 4.228)
-2026-04-24 22:36:12.805 [main] INFO  top.yuxs.springbootdev.db.DatabaseInitService - 开始数据库初始化，扫描包: top.yuxs.springbootdev.entity
-2026-04-24 22:36:12.810 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
-2026-04-24 22:36:12.976 [main] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@761a0bbd
-2026-04-24 22:36:12.979 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
-2026-04-24 22:36:13.046 [main] INFO  top.yuxs.springbootdev.db.DatabaseInitService - 开始检查并初始化默认数据...
-2026-04-24 22:36:13.063 [main] INFO  top.yuxs.springbootdev.db.DatabaseInitService - 数据库初始化完成
-2026-04-24 22:36:13.258 [RMI TCP Connection(1)-192.168.1.133] INFO  org.apache.catalina.core.ContainerBase.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
-2026-04-24 22:36:13.258 [RMI TCP Connection(1)-192.168.1.133] INFO  org.springframework.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
-2026-04-24 22:36:13.260 [RMI TCP Connection(1)-192.168.1.133] INFO  org.springframework.web.servlet.DispatcherServlet - Completed initialization in 2 ms
+2026-05-10 21:51:20.029 [main] INFO  top.yuxs.springbootdev.SpringbootDevApplicationTests - Starting SpringbootDevApplicationTests using Java 21.0.6 with PID 23204 (started by 28310 in D:\CodeProject\DevelopmentProjects\springbootDev)
+2026-05-10 21:51:20.041 [main] INFO  top.yuxs.springbootdev.SpringbootDevApplicationTests - No active profile set, falling back to 1 default profile: "default"
+2026-05-10 21:51:20.293 [background-preinit] INFO  org.hibernate.validator.internal.util.Version - HV000001: Hibernate Validator 9.0.1.Final
+2026-05-10 21:51:20.977 [main] INFO  org.springframework.data.repository.config.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-05-10 21:51:20.981 [main] INFO  org.springframework.data.repository.config.RepositoryConfigurationDelegate - Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-05-10 21:51:21.024 [main] INFO  org.springframework.data.repository.config.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 25 ms. Found 0 Redis repository interfaces.
+2026-05-10 21:51:22.254 [main] INFO  top.yuxs.springbootdev.modules.system.controller.CommonController - 开始扫描全局枚举，根包路径: top.yuxs.springbootdev
+2026-05-10 21:51:22.293 [main] INFO  top.yuxs.springbootdev.modules.system.controller.CommonController - 全局枚举扫描完成，共加载 4 个枚举类
+2026-05-10 21:51:23.407 [main] INFO  com.baomidou.mybatisplus.extension.spring.MybatisPlusApplicationContextAware - Register ApplicationContext instances org.springframework.web.context.support.GenericWebApplicationContext@661d88a
+2026-05-10 21:51:23.895 [main] INFO  org.springframework.boot.actuate.endpoint.web.EndpointLinksResolver - Exposing 1 endpoint beneath base path '/actuator'
+2026-05-10 21:51:24.000 [main] INFO  top.yuxs.springbootdev.SpringbootDevApplicationTests - Started SpringbootDevApplicationTests in 4.441 seconds (process running for 5.674)
+2026-05-10 21:51:24.095 [main] INFO  top.yuxs.springbootdev.core.db.DatabaseInitService - 开始数据库初始化，扫描包: top.yuxs.springbootdev.modules
+2026-05-10 21:51:24.095 [main] INFO  top.yuxs.springbootdev.core.db.EntityScanner - 开始扫描实体类，基础包: top.yuxs.springbootdev.modules
+2026-05-10 21:51:24.118 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2026-05-10 21:51:24.263 [main] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@1488d1c
+2026-05-10 21:51:24.271 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2026-05-10 21:51:24.322 [main] INFO  top.yuxs.springbootdev.core.db.DatabaseInitService - 开始检查并初始化默认数据...
+2026-05-10 21:51:24.326 [main] INFO  top.yuxs.springbootdev.core.db.DatabaseInitService - 数据库初始化完成
+2026-05-10 21:51:24.841 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+2026-05-10 21:51:24.864 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
