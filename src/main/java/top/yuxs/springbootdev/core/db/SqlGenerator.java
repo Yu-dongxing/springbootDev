@@ -13,6 +13,7 @@ import top.yuxs.springbootdev.core.db.annotation.ForeignKey;
 import top.yuxs.springbootdev.core.db.annotation.Index;
 import top.yuxs.springbootdev.core.db.metadata.ColumnMetadata;
 import top.yuxs.springbootdev.core.db.metadata.TableMetadata;
+import top.yuxs.springbootdev.core.enums.db.IndexType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -123,7 +124,8 @@ public class SqlGenerator {
         }
 
         if (column.getComment() != null && !column.getComment().isEmpty()) {
-            sb.append(" COMMENT '").append(column.getComment()).append("'");
+            String safeComment = column.getComment().replace("'", "''");
+            sb.append(" COMMENT '").append(safeComment).append("'");
         }
 
         return sb.toString();
@@ -138,9 +140,12 @@ public class SqlGenerator {
         }
         sb.append("`").append(index.name()).append("` ");
         sb.append("(`").append(String.join("`,`", index.columns())).append("`) ");
-        sb.append("USING BTREE");
+        if (index.type() != IndexType.FULLTEXT) {
+            sb.append("USING BTREE");
+        }
         if (!index.comment().isEmpty()) {
-            sb.append(" COMMENT '").append(index.comment()).append("'");
+            String safeComment = index.comment().replace("'", "''");
+            sb.append(" COMMENT '").append(safeComment).append("'");
         }
         return sb.toString();
     }

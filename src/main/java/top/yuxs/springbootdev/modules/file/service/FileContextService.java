@@ -103,11 +103,13 @@ public class FileContextService {
         sysFile.setUploadIp(getIpAddress());
 
         try {
-            // 4. 发布上传完成事件 (由监听器负责落库，实现存储逻辑与数据库逻辑的解耦)
+            // 4. 同步保存记录，保障事务强一致性
+            sysFileService.save(sysFile);
+            // 5. 发布上传完成事件，供旁路业务消费
             eventPublisher.publishEvent(new FileUploadedEvent(this, sysFile));
         } catch (Exception e) {
-            // 5. 异常补偿：落库失败则删除已上传的物理文件
-            log.error("文件记录落库失败，执行补偿删除: {}", filePath, e);
+            // 6. 异常补偿：落库失败则删除已上传的物理文件
+            log.error("文件记录落库/保存失败，执行补偿物理删除: {}", filePath, e);
             storageService.delete(filePath);
             throw new BusinessException("文件上传保存记录失败");
         }
@@ -129,15 +131,18 @@ public class FileContextService {
         }
 
         if (physical) {
-            // 物理删除：先删记录 (调用物理删除方法，绕过 @TableLogic)
-            sysFileService.physicalDeleteById(id);
+            // 物理删除：先删物理文件，再删数据库记录
             try {
                 StorageService storageService = storageFactory.getService(StorageType.valueOf(sysFile.getStorageType()));
                 storageService.delete(sysFile.getFilePath());
             } catch (Exception e) {
                 log.error("物理文件删除失败: {}", sysFile.getFilePath(), e);
-                // 宽松模式：物理文件删除失败不影响业务流程（后续可通过脚本清理）
+                // 抛出异常阻断事务，防止产生无法追踪的孤儿物理文件
+                throw new BusinessException("物理文件删除失败，阻断数据库元数据删除！");
             }
+            
+            // 后删记录 (调用物理删除方法，绕过 @TableLogic)
+            sysFileService.physicalDeleteById(id);
         } else {
             // 逻辑删除 (MyBatis-Plus 配置 @TableLogic 后 removeById 即为逻辑删除)
             sysFileService.removeById(id);

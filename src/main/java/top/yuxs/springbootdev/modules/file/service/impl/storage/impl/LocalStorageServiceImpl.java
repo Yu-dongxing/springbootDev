@@ -55,12 +55,22 @@ public class LocalStorageServiceImpl implements StorageService {
             
             // 构造物理路径
             String uploadPath = fileProperties.getLocal().getUploadPath();
+            Path rootPath = Paths.get(uploadPath).toAbsolutePath().normalize();
             Path directory = Paths.get(uploadPath, relativeDir).toAbsolutePath().normalize();
+            
+            // 校验根路径，防范路径穿越越界
+            if (!directory.startsWith(rootPath)) {
+                throw new BusinessException("非法上传路径，禁止越界！");
+            }
+            
             if (!Files.exists(directory)) {
                 Files.createDirectories(directory);
             }
             
-            Path targetPath = directory.resolve(fileName);
+            Path targetPath = directory.resolve(fileName).toAbsolutePath().normalize();
+            if (!targetPath.startsWith(rootPath)) {
+                throw new BusinessException("非法上传路径，禁止越界！");
+            }
             file.transferTo(targetPath.toFile());
             
             // 返回相对路径：path/yyyy/MM/fileName
@@ -76,6 +86,12 @@ public class LocalStorageServiceImpl implements StorageService {
         String uploadPath = fileProperties.getLocal().getUploadPath();
         Path rootPath = Paths.get(uploadPath).toAbsolutePath().normalize();
         Path targetPath = rootPath.resolve(filePath).toAbsolutePath().normalize();
+        
+        // 校验根路径，防范越界物理删除
+        if (!targetPath.startsWith(rootPath)) {
+            log.warn("非法删除路径拦截，目标路径不在上传根目录内: {}", filePath);
+            return;
+        }
         
         try {
             if (Files.deleteIfExists(targetPath)) {

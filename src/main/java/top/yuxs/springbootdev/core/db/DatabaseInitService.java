@@ -83,7 +83,8 @@ public class DatabaseInitService {
                 updateTableColumnsAndIndexes(table);
             }
         } catch (Exception e) {
-            log.error("同步表 {} 结构失败: {}", tableName, e.getMessage());
+            log.error("同步表 {} 结构失败: {}", tableName, e.getMessage(), e);
+            throw new RuntimeException("数据库建表或结构同步失败，表名: " + tableName, e);
         }
     }
 
@@ -131,7 +132,8 @@ public class DatabaseInitService {
                 }
             }
         } catch (Exception e) {
-            log.error("同步表 {} 外键失败: {}", tableName, e.getMessage());
+            log.error("同步表 {} 外键失败: {}", tableName, e.getMessage(), e);
+            throw new RuntimeException("同步表外键失败，表名: " + tableName, e);
         }
     }
 
@@ -160,7 +162,8 @@ public class DatabaseInitService {
             log.info("表 {} 插入默认数据: {}", tableName, defaultData);
             schemaExecutor.executeWithParams(sql, defaultData.values().toArray());
         } catch (Exception e) {
-            log.error("表 {} 插入默认数据失败: {}", tableName, e.getMessage());
+            log.error("表 {} 插入默认数据失败: {}", tableName, e.getMessage(), e);
+            throw new RuntimeException("插入表 " + tableName + " 默认数据失败", e);
         }
     }
 }

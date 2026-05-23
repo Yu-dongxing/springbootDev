@@ -1,20 +1,20 @@
-2026-05-10 21:51:20.029 [main] INFO  top.yuxs.springbootdev.SpringbootDevApplicationTests - Starting SpringbootDevApplicationTests using Java 21.0.6 with PID 23204 (started by 28310 in D:\CodeProject\DevelopmentProjects\springbootDev)
-2026-05-10 21:51:20.041 [main] INFO  top.yuxs.springbootdev.SpringbootDevApplicationTests - No active profile set, falling back to 1 default profile: "default"
-2026-05-10 21:51:20.293 [background-preinit] INFO  org.hibernate.validator.internal.util.Version - HV000001: Hibernate Validator 9.0.1.Final
-2026-05-10 21:51:20.977 [main] INFO  org.springframework.data.repository.config.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
-2026-05-10 21:51:20.981 [main] INFO  org.springframework.data.repository.config.RepositoryConfigurationDelegate - Bootstrapping Spring Data Redis repositories in DEFAULT mode.
-2026-05-10 21:51:21.024 [main] INFO  org.springframework.data.repository.config.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 25 ms. Found 0 Redis repository interfaces.
-2026-05-10 21:51:22.254 [main] INFO  top.yuxs.springbootdev.modules.system.controller.CommonController - 开始扫描全局枚举，根包路径: top.yuxs.springbootdev
-2026-05-10 21:51:22.293 [main] INFO  top.yuxs.springbootdev.modules.system.controller.CommonController - 全局枚举扫描完成，共加载 4 个枚举类
-2026-05-10 21:51:23.407 [main] INFO  com.baomidou.mybatisplus.extension.spring.MybatisPlusApplicationContextAware - Register ApplicationContext instances org.springframework.web.context.support.GenericWebApplicationContext@661d88a
-2026-05-10 21:51:23.895 [main] INFO  org.springframework.boot.actuate.endpoint.web.EndpointLinksResolver - Exposing 1 endpoint beneath base path '/actuator'
-2026-05-10 21:51:24.000 [main] INFO  top.yuxs.springbootdev.SpringbootDevApplicationTests - Started SpringbootDevApplicationTests in 4.441 seconds (process running for 5.674)
-2026-05-10 21:51:24.095 [main] INFO  top.yuxs.springbootdev.core.db.DatabaseInitService - 开始数据库初始化，扫描包: top.yuxs.springbootdev.modules
-2026-05-10 21:51:24.095 [main] INFO  top.yuxs.springbootdev.core.db.EntityScanner - 开始扫描实体类，基础包: top.yuxs.springbootdev.modules
-2026-05-10 21:51:24.118 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
-2026-05-10 21:51:24.263 [main] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@1488d1c
-2026-05-10 21:51:24.271 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
-2026-05-10 21:51:24.322 [main] INFO  top.yuxs.springbootdev.core.db.DatabaseInitService - 开始检查并初始化默认数据...
-2026-05-10 21:51:24.326 [main] INFO  top.yuxs.springbootdev.core.db.DatabaseInitService - 数据库初始化完成
-2026-05-10 21:51:24.841 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
-2026-05-10 21:51:24.864 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
+2026-05-23 22:14:12.636 [main] INFO  top.yuxs.springbootdev.SpringbootDevApplicationTests - Starting SpringbootDevApplicationTests using Java 21.0.6 with PID 11920 (started by 28310 in D:\CodeProject\DevelopmentProjects\springbootDev)
+2026-05-23 22:14:12.651 [main] INFO  top.yuxs.springbootdev.SpringbootDevApplicationTests - No active profile set, falling back to 1 default profile: "default"
+2026-05-23 22:14:13.020 [background-preinit] INFO  org.hibernate.validator.internal.util.Version - HV000001: Hibernate Validator 9.0.1.Final
+2026-05-23 22:14:14.000 [main] INFO  org.springframework.data.repository.config.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-05-23 22:14:14.005 [main] INFO  org.springframework.data.repository.config.RepositoryConfigurationDelegate - Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-05-23 22:14:14.068 [main] INFO  org.springframework.data.repository.config.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 33 ms. Found 0 Redis repository interfaces.
+2026-05-23 22:14:15.730 [main] INFO  top.yuxs.springbootdev.modules.system.controller.CommonController - 开始扫描全局枚举，根包路径: top.yuxs.springbootdev
+2026-05-23 22:14:15.777 [main] INFO  top.yuxs.springbootdev.modules.system.controller.CommonController - 全局枚举扫描完成，共加载 4 个枚举类
+2026-05-23 22:14:17.487 [main] INFO  com.baomidou.mybatisplus.extension.spring.MybatisPlusApplicationContextAware - Register ApplicationContext instances org.springframework.web.context.support.GenericWebApplicationContext@661d88a
+2026-05-23 22:14:18.070 [main] INFO  org.springframework.boot.actuate.endpoint.web.EndpointLinksResolver - Exposing 1 endpoint beneath base path '/actuator'
+2026-05-23 22:14:18.262 [main] INFO  top.yuxs.springbootdev.SpringbootDevApplicationTests - Started SpringbootDevApplicationTests in 6.297 seconds (process running for 8.569)
+2026-05-23 22:14:18.385 [main] INFO  top.yuxs.springbootdev.core.db.DatabaseInitService - 开始数据库初始化，扫描包: top.yuxs.springbootdev.modules
+2026-05-23 22:14:18.385 [main] INFO  top.yuxs.springbootdev.core.db.EntityScanner - 开始扫描实体类，基础包: top.yuxs.springbootdev.modules
+2026-05-23 22:14:18.418 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2026-05-23 22:14:18.689 [main] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@624268ab
+2026-05-23 22:14:18.698 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2026-05-23 22:14:18.785 [main] INFO  top.yuxs.springbootdev.core.db.DatabaseInitService - 开始检查并初始化默认数据...
+2026-05-23 22:14:18.802 [main] INFO  top.yuxs.springbootdev.core.db.DatabaseInitService - 数据库初始化完成
+2026-05-23 22:14:19.606 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+2026-05-23 22:14:19.631 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.

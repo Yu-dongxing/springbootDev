@@ -26,13 +26,6 @@ public class FileUploadedListener {
 
     @EventListener
     public void onFileUploaded(FileUploadedEvent event) {
-        log.info("监听到文件上传完成事件，准备落库: {}", event.getSysFile().getFileName());
-        try {
-            sysFileService.save(event.getSysFile());
-        } catch (Exception e) {
-            log.error("文件落库失败: {}", event.getSysFile().getFileName(), e);
-            // 这里可以抛出异常以回滚事务（如果发布者开启了事务且监听器是同步的）
-            throw e;
-        }
+        log.info("监听到文件上传完成事件，已由主服务同步落库完毕: {}", event.getSysFile().getFileName());
     }
 }
