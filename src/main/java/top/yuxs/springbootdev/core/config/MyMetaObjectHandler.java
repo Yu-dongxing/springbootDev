@@ -37,7 +37,9 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
         // 1. 获取当前时间 (Asia/Shanghai)
         LocalDateTime beijingTime = LocalDateTime.now(ZoneId.of("Asia/Shanghai"));
 
-        // 2. 更新时：只刷新 updateTime
-        this.strictUpdateFill(metaObject, "updateTime", LocalDateTime.class, beijingTime);
+        // 2. 更新时：通过 MetaObject 强制强行设值覆盖，解决 strictUpdateFill 因为旧值非空而跳过更新的问题
+        if (metaObject.hasSetter("updateTime")) {
+            metaObject.setValue("updateTime", beijingTime);
+        }
     }
 }
