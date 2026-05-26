@@ -27,10 +27,39 @@ import java.util.stream.Collectors;
 public class SqlGenerator {
 
     /**
+     * 安全校验：强制 SQL 标识符只能包含字母、数字和下划线，防御 SQL 注入
+     */
+    public static String sanitizeIdentifier(String identifier) {
+        if (identifier == null) {
+            throw new IllegalArgumentException("标识符不能为空");
+        }
+        String trimmed = identifier.trim();
+        if (!trimmed.matches("^[a-zA-Z0-9_]+$")) {
+            throw new IllegalArgumentException("非法的 SQL 标识符（仅允许字母、数字和下划线）: " + identifier);
+        }
+        return trimmed;
+    }
+
+    /**
+     * 安全校验：限制列类型定义中只含有类型名字、长度和空格
+     */
+    public static String sanitizeColumnType(String type) {
+        if (type == null) {
+            throw new IllegalArgumentException("列类型不能为空");
+        }
+        String trimmed = type.trim();
+        if (!trimmed.matches("^[a-zA-Z0-9_(),\\s]+$")) {
+            throw new IllegalArgumentException("非法的列类型名称: " + type);
+        }
+        return trimmed;
+    }
+
+    /**
      * 生成建表 SQL
      */
     public String generateCreateTableSql(TableMetadata table) {
-        StringBuilder sql = new StringBuilder("CREATE TABLE `").append(table.getTableName()).append("` (");
+        String tableName = sanitizeIdentifier(table.getTableName());
+        StringBuilder sql = new StringBuilder("CREATE TABLE `").append(tableName).append("` (");
         List<String> definitions = new ArrayList<>();
 
         for (ColumnMetadata column : table.getColumns()) {
@@ -43,7 +72,9 @@ public class SqlGenerator {
 
         sql.append(String.join(", ", definitions)).append(")");
         if (table.getTableComment() != null && !table.getTableComment().isEmpty()) {
-            sql.append(" COMMENT='").append(table.getTableComment()).append("'");
+            // 修复表注释未转义单引号的问题
+            String safeComment = table.getTableComment().replace("'", "''");
+            sql.append(" COMMENT='").append(safeComment).append("'");
         }
         sql.append(";");
         return sql.toString();
@@ -53,21 +84,21 @@ public class SqlGenerator {
      * 生成新增列 SQL
      */
     public String generateAddColumnSql(String tableName, ColumnMetadata column) {
-        return String.format("ALTER TABLE `%s` ADD COLUMN %s;", tableName, buildColumnDefinition(column));
+        return String.format("ALTER TABLE `%s` ADD COLUMN %s;", sanitizeIdentifier(tableName), buildColumnDefinition(column));
     }
 
     /**
      * 生成修改列 SQL
      */
     public String generateModifyColumnSql(String tableName, ColumnMetadata column) {
-        return String.format("ALTER TABLE `%s` MODIFY COLUMN %s;", tableName, buildColumnDefinition(column));
+        return String.format("ALTER TABLE `%s` MODIFY COLUMN %s;", sanitizeIdentifier(tableName), buildColumnDefinition(column));
     }
 
     /**
      * 生成新增索引 SQL
      */
     public String generateCreateIndexSql(String tableName, Index index) {
-        return "ALTER TABLE `" + tableName + "` ADD " + buildIndexDefinition(index) + ";";
+        return "ALTER TABLE `" + sanitizeIdentifier(tableName) + "` ADD " + buildIndexDefinition(index) + ";";
     }
 
     /**
@@ -79,13 +110,24 @@ public class SqlGenerator {
             throw new IllegalArgumentException("外键引用实体 " + fk.referenceEntity().getSimpleName() + " 缺失 @TableName");
         }
 
-        String columnsSql = "`" + String.join("`,`", fk.columns()) + "`";
-        String refColumnsSql = "`" + String.join("`,`", fk.referencedColumns()) + "`";
+        String safeTableName = sanitizeIdentifier(tableName);
+        String safeFkName = sanitizeIdentifier(fk.name());
+        String safeRefTableName = sanitizeIdentifier(refAnn.value());
+
+        List<String> safeColumns = java.util.Arrays.stream(fk.columns())
+                .map(SqlGenerator::sanitizeIdentifier)
+                .collect(Collectors.toList());
+        List<String> safeRefColumns = java.util.Arrays.stream(fk.referencedColumns())
+                .map(SqlGenerator::sanitizeIdentifier)
+                .collect(Collectors.toList());
+
+        String columnsSql = "`" + String.join("`,`", safeColumns) + "`";
+        String refColumnsSql = "`" + String.join("`,`", safeRefColumns) + "`";
         String onDelete = "ON DELETE " + fk.onDelete().name().replace('_', ' ');
         String onUpdate = "ON UPDATE " + fk.onUpdate().name().replace('_', ' ');
 
         return String.format("ALTER TABLE `%s` ADD CONSTRAINT `%s` FOREIGN KEY (%s) REFERENCES `%s` (%s) %s %s;",
-                tableName, fk.name(), columnsSql, refAnn.value(), refColumnsSql, onDelete, onUpdate);
+                safeTableName, safeFkName, columnsSql, safeRefTableName, refColumnsSql, onDelete, onUpdate);
     }
 
     /**
@@ -94,12 +136,13 @@ public class SqlGenerator {
     public String generateInsertDefaultDataSql(String tableName, Map<String, Object> defaultData) {
         if (defaultData.isEmpty()) return null;
 
-        StringBuilder sql = new StringBuilder("INSERT INTO `").append(tableName).append("` (");
+        StringBuilder sql = new StringBuilder("INSERT INTO `").append(sanitizeIdentifier(tableName)).append("` (");
         StringBuilder placeholders = new StringBuilder();
 
         List<String> columns = new ArrayList<>(defaultData.keySet());
         for (int i = 0; i < columns.size(); i++) {
-            sql.append("`").append(columns.get(i)).append("`").append(i == columns.size() - 1 ? "" : ", ");
+            String colName = sanitizeIdentifier(columns.get(i));
+            sql.append("`").append(colName).append("`").append(i == columns.size() - 1 ? "" : ", ");
             placeholders.append("?").append(i == columns.size() - 1 ? "" : ", ");
         }
 
@@ -109,8 +152,8 @@ public class SqlGenerator {
 
     private String buildColumnDefinition(ColumnMetadata column) {
         StringBuilder sb = new StringBuilder();
-        sb.append("`").append(column.getName()).append("` ");
-        sb.append(column.getType());
+        sb.append("`").append(sanitizeIdentifier(column.getName())).append("` ");
+        sb.append(sanitizeColumnType(column.getType()));
 
         if (column.isPrimaryKey()) {
             sb.append(" PRIMARY KEY");
@@ -120,7 +163,12 @@ public class SqlGenerator {
         }
 
         if (column.getDefaultValue() != null) {
-            sb.append(" DEFAULT ").append(column.getDefaultValue());
+            String defVal = column.getDefaultValue().trim();
+            // 简单防范注入，默认值禁止出现分号和注释段
+            if (defVal.contains(";") || defVal.contains("--") || defVal.contains("/*")) {
+                throw new IllegalArgumentException("默认值中含有不安全的 SQL 字符: " + defVal);
+            }
+            sb.append(" DEFAULT ").append(defVal);
         }
 
         if (column.getComment() != null && !column.getComment().isEmpty()) {
@@ -138,8 +186,13 @@ public class SqlGenerator {
             case FULLTEXT -> sb.append("FULLTEXT KEY ");
             default -> sb.append("KEY ");
         }
-        sb.append("`").append(index.name()).append("` ");
-        sb.append("(`").append(String.join("`,`", index.columns())).append("`) ");
+        sb.append("`").append(sanitizeIdentifier(index.name())).append("` ");
+        
+        List<String> safeColumns = java.util.Arrays.stream(index.columns())
+                .map(SqlGenerator::sanitizeIdentifier)
+                .collect(Collectors.toList());
+        sb.append("(`").append(String.join("`,`", safeColumns)).append("`) ");
+        
         if (index.type() != IndexType.FULLTEXT) {
             sb.append("USING BTREE");
         }

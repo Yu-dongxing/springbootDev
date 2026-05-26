@@ -71,16 +71,34 @@ public class CommonController {
                     String simpleName = clazz.getSimpleName();
                     // 驼峰命名作为 Key
                     String key = Character.toLowerCase(simpleName.charAt(0)) + simpleName.substring(1);
+                    List<Map<String, Object>> enumList = reflectEnumToList(clazz);
 
-                    // 存入缓存
-                    allEnumsCache.put(key, reflectEnumToList(clazz));
-                    enumClassCache.put(simpleName, clazz);
+                    // 1. 注册全限定类名映射 (绝对唯一)
+                    allEnumsCache.put(className, enumList);
+                    enumClassCache.put(className, clazz);
+
+                    // 2. 注册简单类名映射 (同名覆盖防御，保留先注册的并给出 warn 警告)
+                    if (enumClassCache.containsKey(simpleName)) {
+                        log.warn("检测到重复的枚举类简单名称: [{}], 原映射指向: [{}], 建议此后采用全限制类名查询", 
+                                className, enumClassCache.get(simpleName).getName());
+                    } else {
+                        enumClassCache.put(simpleName, clazz);
+                        allEnumsCache.put(simpleName, enumList);
+                    }
+
+                    // 3. 注册小写驼峰 Key 映射
+                    if (allEnumsCache.containsKey(key)) {
+                        log.warn("检测到重复的枚举驼峰命名 Key: [{}], 跳过覆盖", key);
+                    } else {
+                        allEnumsCache.put(key, enumList);
+                        enumClassCache.put(key, clazz);
+                    }
                 }
             } catch (Exception e) {
                 log.error("解析枚举类 [{}] 失败", className, e);
             }
         }
-        log.info("全局枚举扫描完成，共加载 {} 个枚举类", enumClassCache.size());
+        log.info("全局枚举扫描完成，共加载 {} 个唯一枚举类映射", enumClassCache.size());
     }
 
     /**
@@ -93,11 +111,17 @@ public class CommonController {
 
     /**
      * 指定类名返回枚举
-     * 示例: /api/common/enums/ResultCode
+     * 示例: /api/common/enums/ResultCode 或 /api/common/enums/resultCode
      */
     @GetMapping("/enums/{enumName}")
     public Result<?> getEnumByName(@PathVariable String enumName) {
         Class<?> clazz = enumClassCache.get(enumName);
+        if (clazz == null && enumName.length() > 0) {
+            // 如果传入小驼峰无法匹配，尝试将首字母转为大写匹配
+            String normalizedName = Character.toUpperCase(enumName.charAt(0)) + enumName.substring(1);
+            clazz = enumClassCache.get(normalizedName);
+        }
+        
         if (clazz != null) {
             try {
                 return Result.success(reflectEnumToList(clazz));

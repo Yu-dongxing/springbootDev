@@ -39,9 +39,9 @@ spring:
     # 3. cachePrepStmts=true & prepStmtCacheSize=250 & prepStmtCacheSqlLimit=2048：开启预编译语句缓存，极大提升高频重复 SQL 的性能
     # 4. useServerPrepStmts=true：开启服务端预编译
     # 5. createDatabaseIfNotExist=true: 数据库自动建库
-    url: jdbc:mysql://127.0.0.1:3306/dev?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048&useServerPrepStmts=true&createDatabaseIfNotExist=true
-    username: root
-    password: 123456789
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:dev}?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048&useServerPrepStmts=true&createDatabaseIfNotExist=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456789}
     type: com.zaxxer.hikari.HikariDataSource
     hikari:
       # 最小空闲连接数 (高并发下建议与 maximum-pool-size 保持一致，避免频繁创建和销毁连接带来的性能损耗)

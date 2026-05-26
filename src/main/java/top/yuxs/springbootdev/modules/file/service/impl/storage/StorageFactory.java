@@ -37,7 +37,7 @@ public class StorageFactory {
     @Autowired
     private List<StorageService> storageServices;
 
-    private static final Map<StorageType, StorageService> SERVICE_MAP = new HashMap<>();
+    private final Map<StorageType, StorageService> SERVICE_MAP = new HashMap<>();
 
     @PostConstruct
     public void init() {

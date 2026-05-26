@@ -34,11 +34,20 @@ public class SchemaExecutor {
         return count != null && count > 0;
     }
 
-    public Map<String, String> getExistingColumnsInfo(String tableName) {
-        String sql = "SELECT COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
-        Map<String, String> map = new HashMap<>();
+    public Map<String, top.yuxs.springbootdev.core.db.metadata.ColumnMetadata> getExistingColumnsInfo(String tableName) {
+        String sql = "SELECT COLUMN_NAME, COLUMN_TYPE, COLUMN_COMMENT FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
+        Map<String, top.yuxs.springbootdev.core.db.metadata.ColumnMetadata> map = new HashMap<>();
         jdbcTemplate.query(sql, (rs) -> {
-            map.put(rs.getString("COLUMN_NAME").toLowerCase(), rs.getString("COLUMN_TYPE"));
+            String colName = rs.getString("COLUMN_NAME");
+            String colType = rs.getString("COLUMN_TYPE");
+            String colComment = rs.getString("COLUMN_COMMENT");
+            
+            top.yuxs.springbootdev.core.db.metadata.ColumnMetadata metadata = top.yuxs.springbootdev.core.db.metadata.ColumnMetadata.builder()
+                    .name(colName)
+                    .type(colType)
+                    .comment(colComment)
+                    .build();
+            map.put(colName.toLowerCase(), metadata);
         }, tableName);
         return map;
     }

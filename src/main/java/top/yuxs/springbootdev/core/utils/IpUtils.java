@@ -60,17 +60,72 @@ public final class IpUtils {
     /**
      * 获取客户端真实 IP 及来源信息，便于排查代理链问题。
      */
+    private static final java.util.regex.Pattern IPV4_PATTERN =
+            java.util.regex.Pattern.compile("^((25[0-5]|2[0-4]\\d|[01]?\\d\\d?)\\.){3}(25[0-5]|2[0-4]\\d|[01]?\\d\\d?)$");
+
+    private static final java.util.regex.Pattern IPV6_PATTERN =
+            java.util.regex.Pattern.compile("^([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}$|" +
+                    "^([0-9a-fA-F]{1,4}:){1,7}:$|" +
+                    "^([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}$|" +
+                    "^([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}$|" +
+                    "^([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}$|" +
+                    "^([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}$|" +
+                    "^([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}$|" +
+                    "^[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})$|" +
+                    "^:(:[0-9a-fA-F]{1,4}){1,7}$|" +
+                    "^::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])$|" +
+                    "^([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])$");
+
+    public static boolean isValidIp(String ip) {
+        if (ip == null) {
+            return false;
+        }
+        String trimmed = ip.trim();
+        return IPV4_PATTERN.matcher(trimmed).matches() || IPV6_PATTERN.matcher(trimmed).matches();
+    }
+
+    public static boolean isInternalIp(String ip) {
+        if (ip == null) {
+            return false;
+        }
+        String trimmed = ip.trim();
+        if ("127.0.0.1".equals(trimmed) || "0:0:0:0:0:0:0:1".equals(trimmed) || "::1".equals(trimmed)) {
+            return true;
+        }
+        if (trimmed.startsWith("10.") || trimmed.startsWith("192.168.")) {
+            return true;
+        }
+        if (trimmed.startsWith("172.")) {
+            String[] parts = trimmed.split("\\.");
+            if (parts.length >= 2) {
+                try {
+                    int second = Integer.parseInt(parts[1]);
+                    return second >= 16 && second <= 31;
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 获取客户端真实 IP 及来源信息，便于排查代理链问题。
+     */
     public static IpResolveResult resolveClientIp(HttpServletRequest request) {
-        for (String header : IP_HEADER_CANDIDATES) {
-            String headerValue = request.getHeader(header);
-            String candidateIp = extractClientIp(header, headerValue);
-            if (candidateIp != null) {
-                return new IpResolveResult(candidateIp, header, headerValue, request.getRemoteAddr());
+        String remoteAddr = request.getRemoteAddr();
+        
+        // 只有当请求的直连源地址（RemoteAddr）为本地或内网 IP 时，我们才相信代理请求头，否则视为公网客户端直连，忽略所有代理头
+        if (isInternalIp(remoteAddr)) {
+            for (String header : IP_HEADER_CANDIDATES) {
+                String headerValue = request.getHeader(header);
+                String candidateIp = extractClientIp(header, headerValue);
+                if (candidateIp != null) {
+                    return new IpResolveResult(candidateIp, header, headerValue, remoteAddr);
+                }
             }
         }
 
-        return new IpResolveResult(normalizeLoopbackIp(request.getRemoteAddr()), "RemoteAddr",
-                request.getRemoteAddr(), request.getRemoteAddr());
+        return new IpResolveResult(normalizeLoopbackIp(remoteAddr), "RemoteAddr",
+                remoteAddr, remoteAddr);
     }
 
     /**
@@ -80,7 +135,7 @@ public final class IpUtils {
         Map<String, String> headers = new LinkedHashMap<>();
         for (String header : IP_HEADER_CANDIDATES) {
             String value = request.getHeader(header);
-            if (isValidIpToken(value)) {
+            if (value != null && !value.isBlank() && !UNKNOWN.equalsIgnoreCase(value.trim())) {
                 headers.put(header, value);
             }
         }
@@ -89,7 +144,7 @@ public final class IpUtils {
     }
 
     private static String extractClientIp(String headerName, String rawValue) {
-        if (!isValidIpToken(rawValue)) {
+        if (rawValue == null || rawValue.isBlank() || UNKNOWN.equalsIgnoreCase(rawValue.trim())) {
             return null;
         }
 
@@ -131,7 +186,7 @@ public final class IpUtils {
     }
 
     private static String sanitizeIpToken(String rawValue) {
-        if (!isValidIpToken(rawValue)) {
+        if (rawValue == null || rawValue.isBlank() || UNKNOWN.equalsIgnoreCase(rawValue.trim())) {
             return null;
         }
 
@@ -153,7 +208,7 @@ public final class IpUtils {
         }
 
         value = value.trim();
-        if (!isValidIpToken(value) || "_hidden".equalsIgnoreCase(value)) {
+        if (value.isBlank() || UNKNOWN.equalsIgnoreCase(value) || "_hidden".equalsIgnoreCase(value) || !isValidIp(value)) {
             return null;
         }
 
@@ -161,22 +216,23 @@ public final class IpUtils {
     }
 
     private static boolean isValidIpToken(String value) {
-        return value != null && !value.isBlank() && !UNKNOWN.equalsIgnoreCase(value.trim());
+        return value != null && !value.isBlank() && !UNKNOWN.equalsIgnoreCase(value.trim()) && isValidIp(value.trim());
     }
 
     private static String normalizeLoopbackIp(String ip) {
-        if (!isValidIpToken(ip)) {
+        if (ip == null || ip.isBlank() || UNKNOWN.equalsIgnoreCase(ip.trim())) {
             return ip;
         }
 
-        if ("127.0.0.1".equals(ip) || "0:0:0:0:0:0:0:1".equals(ip) || "::1".equals(ip)) {
+        String trimmed = ip.trim();
+        if ("127.0.0.1".equals(trimmed) || "0:0:0:0:0:0:0:1".equals(trimmed) || "::1".equals(trimmed)) {
             try {
                 return InetAddress.getLocalHost().getHostAddress();
             } catch (UnknownHostException ignored) {
                 return "127.0.0.1";
             }
         }
-        return ip;
+        return trimmed;
     }
 
     public static final class IpResolveResult {

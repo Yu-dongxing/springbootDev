@@ -90,7 +90,7 @@ public class LocalStorageServiceImpl implements StorageService {
         // 校验根路径，防范越界物理删除
         if (!targetPath.startsWith(rootPath)) {
             log.warn("非法删除路径拦截，目标路径不在上传根目录内: {}", filePath);
-            return;
+            throw new BusinessException("非法删除路径拦截，禁止物理删除根路径之外的文件");
         }
         
         try {
@@ -100,7 +100,8 @@ public class LocalStorageServiceImpl implements StorageService {
                 cleanEmptyParentDirectories(targetPath.getParent(), rootPath);
             }
         } catch (IOException e) {
-            log.error("本地文件删除失败: {}", filePath, e);
+            log.error("本地文件物理删除失败: {}", filePath, e);
+            throw new BusinessException("物理文件删除失败: " + e.getMessage());
         }
     }
 

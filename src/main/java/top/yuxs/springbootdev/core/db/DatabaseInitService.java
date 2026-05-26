@@ -90,7 +90,7 @@ public class DatabaseInitService {
 
     private void updateTableColumnsAndIndexes(TableMetadata table) {
         String tableName = table.getTableName();
-        Map<String, String> existingColumnsMap = schemaExecutor.getExistingColumnsInfo(tableName);
+        Map<String, ColumnMetadata> existingColumnsMap = schemaExecutor.getExistingColumnsInfo(tableName);
         Set<String> existingIndexes = schemaExecutor.getExistingIndexNames(tableName);
 
         for (ColumnMetadata column : table.getColumns()) {
@@ -101,9 +101,21 @@ public class DatabaseInitService {
                 log.info("表 {} 新增列: {}", tableName, columnName);
                 schemaExecutor.execute(sqlGenerator.generateAddColumnSql(tableName, column));
             } else {
-                String existingType = existingColumnsMap.get(columnName.toLowerCase()).toLowerCase().replaceAll("\\s", "");
-                if (!targetTypeOnly.equals(existingType)) {
-                    log.info("表 {} 变更列类型: {} -> {}", tableName, existingType, targetTypeOnly);
+                ColumnMetadata existingCol = existingColumnsMap.get(columnName.toLowerCase());
+                String existingType = existingCol.getType().toLowerCase().replaceAll("\\s", "");
+                String existingComment = existingCol.getComment() != null ? existingCol.getComment().trim() : "";
+                String targetComment = column.getComment() != null ? column.getComment().trim() : "";
+                
+                boolean typeChanged = !targetTypeOnly.equals(existingType);
+                boolean commentChanged = !targetComment.equals(existingComment);
+                
+                if (typeChanged || commentChanged) {
+                    if (typeChanged) {
+                        log.info("表 {} 变更列类型: {} -> {}", tableName, existingType, targetTypeOnly);
+                    }
+                    if (commentChanged) {
+                        log.info("表 {} 变更列注释: '{}' -> '{}'", tableName, existingComment, targetComment);
+                    }
                     schemaExecutor.execute(sqlGenerator.generateModifyColumnSql(tableName, column));
                 }
             }
