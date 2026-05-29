@@ -78,6 +78,13 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- AspectJ 增强：提供切面拦截支持（接口请求日志核心依赖） -->
+        <dependency>
+            <groupId>org.aspectj</groupId>
+            <artifactId>aspectjweaver</artifactId>
+            <version>1.9.22.1</version>
+        </dependency>
+
         <!-- Spring Boot Actuator：提供生产级别的应用监控和管理端点 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
