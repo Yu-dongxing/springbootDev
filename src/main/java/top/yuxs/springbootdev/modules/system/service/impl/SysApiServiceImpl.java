@@ -16,7 +16,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import top.yuxs.springbootdev.modules.system.entity.SysApi;
+import top.yuxs.springbootdev.modules.system.entity.SysUserRole;
+import top.yuxs.springbootdev.modules.system.entity.SysRoleApi;
 import top.yuxs.springbootdev.modules.system.mapper.SysApiMapper;
+import top.yuxs.springbootdev.modules.system.mapper.SysUserRoleMapper;
+import top.yuxs.springbootdev.modules.system.mapper.SysRoleApiMapper;
 import top.yuxs.springbootdev.modules.system.service.SysApiService;
 
 import java.util.ArrayList;
@@ -41,6 +45,12 @@ public class SysApiServiceImpl extends ServiceImpl<SysApiMapper, SysApi> impleme
     @Autowired
     private RedisTemplate<String, String> redisTemplate;
 
+    @Autowired
+    private SysUserRoleMapper sysUserRoleMapper;
+
+    @Autowired
+    private SysRoleApiMapper sysRoleApiMapper;
+
     @Override
     public Set<String> getApiPermissionsByUserId(Long userId) {
         if (userId == null) {
@@ -50,9 +60,47 @@ public class SysApiServiceImpl extends ServiceImpl<SysApiMapper, SysApi> impleme
         // 1. 尝试从 Redis 极速读取
         Set<String> apiPerms = redisTemplate.opsForSet().members(cacheKey);
         
-        // 2. 缓存未命中，进行三表联查，并载入缓存
+        // 2. 缓存未命中，进行单表分步查询，并载入缓存
         if (CollectionUtils.isEmpty(apiPerms)) {
-            apiPerms = this.baseMapper.selectApiPermissionsByUserId(userId);
+            // Step 1: 根据 userId 查找拥有的角色 ID 集合
+            List<SysUserRole> userRoles = sysUserRoleMapper.selectList(
+                    new LambdaQueryWrapper<SysUserRole>()
+                            .eq(SysUserRole::getUserId, userId)
+            );
+            if (CollectionUtils.isEmpty(userRoles)) {
+                return Set.of();
+            }
+            List<Long> roleIds = userRoles.stream()
+                    .map(SysUserRole::getRoleId)
+                    .collect(Collectors.toList());
+
+            // Step 2: 根据角色 ID 集合查找关联的 API ID 集合
+            List<SysRoleApi> roleApis = sysRoleApiMapper.selectList(
+                    new LambdaQueryWrapper<SysRoleApi>()
+                            .in(SysRoleApi::getRoleId, roleIds)
+            );
+            if (CollectionUtils.isEmpty(roleApis)) {
+                return Set.of();
+            }
+            List<Long> apiIds = roleApis.stream()
+                    .map(SysRoleApi::getApiId)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            // Step 3: 根据 API ID 集合查找可用的 API 记录并抽取权限标识
+            List<SysApi> apis = this.list(
+                    new LambdaQueryWrapper<SysApi>()
+                            .in(SysApi::getId, apiIds)
+                            .eq(SysApi::getStatus, 0)
+            );
+            if (CollectionUtils.isEmpty(apis)) {
+                return Set.of();
+            }
+
+            apiPerms = apis.stream()
+                    .map(api -> api.getMethod() + ":" + api.getPath())
+                    .collect(Collectors.toSet());
+
             if (!CollectionUtils.isEmpty(apiPerms)) {
                 redisTemplate.opsForSet().add(cacheKey, apiPerms.toArray(new String[0]));
                 // 缓存设置 2 小时随机过期，防止缓存雪崩

@@ -9,10 +9,7 @@ package top.yuxs.springbootdev.modules.system.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
 import top.yuxs.springbootdev.modules.system.entity.SysMenu;
-
-import java.util.List;
 
 /**
  * 系统菜单与按钮权限 Mapper 接口
@@ -23,8 +20,4 @@ import java.util.List;
 @Mapper
 public interface SysMenuMapper extends BaseMapper<SysMenu> {
 
-    /**
-     * 根据用户ID查询前端按钮权限标识列表
-     */
-    List<String> selectPermsByUserId(@Param("userId") Long userId);
 }

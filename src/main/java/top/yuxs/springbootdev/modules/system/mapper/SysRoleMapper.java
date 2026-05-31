@@ -9,10 +9,7 @@ package top.yuxs.springbootdev.modules.system.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
 import top.yuxs.springbootdev.modules.system.entity.SysRole;
-
-import java.util.List;
 
 /**
  * 系统角色 Mapper 接口
@@ -23,8 +20,4 @@ import java.util.List;
 @Mapper
 public interface SysRoleMapper extends BaseMapper<SysRole> {
 
-    /**
-     * 根据用户ID查询拥有的角色标识
-     */
-    List<String> selectRoleKeysByUserId(@Param("userId") Long userId);
 }
