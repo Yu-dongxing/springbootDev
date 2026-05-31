@@ -159,3 +159,17 @@ file:
     bucket-name: my-bucket
     access-key: xxxx
     secret-key: xxxx
+
+# =========================================================
+# JustAuth 第三方登录配置
+# =========================================================
+justauth:
+  type:
+    github:
+      client-id: ${OAUTH_GITHUB_CLIENT_ID:your_github_id}
+      client-secret: ${OAUTH_GITHUB_CLIENT_SECRET:your_github_secret}
+      redirect-uri: http://localhost:8080/api/common/oauth/callback/github
+    gitee:
+      client-id: ${OAUTH_GITEE_CLIENT_ID:your_gitee_id}
+      client-secret: ${OAUTH_GITEE_CLIENT_SECRET:your_gitee_secret}
+      redirect-uri: http://localhost:8080/api/common/oauth/callback/gitee

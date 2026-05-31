@@ -55,6 +55,8 @@
         <bouncycastle.version>1.80</bouncycastle.version>
         <!-- Disruptor 版本  -->
         <disruptor.version>3.4.4</disruptor.version>
+        <!-- JustAuth 版本 -->
+        <justauth.version>1.16.7</justauth.version>
     </properties>
 
     <dependencies>
@@ -206,6 +208,13 @@
             <groupId>com.alibaba.fastjson2</groupId>
             <artifactId>fastjson2</artifactId>
             <version>${fastjson2.version}</version>
+        </dependency>
+
+        <!-- JustAuth 第三方登录核心 -->
+        <dependency>
+            <groupId>me.zhyd.oauth</groupId>
+            <artifactId>JustAuth</artifactId>
+            <version>${justauth.version}</version>
         </dependency>
 
         <!-- JsonPath：强大的 JSON 数据提取工具 (版本由 Spring Boot Parent 管理) -->
