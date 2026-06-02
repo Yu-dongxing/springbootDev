@@ -89,6 +89,7 @@ public class SaTokenConfig implements WebMvcConfigurer {
             if (SaRouter.match(
                     "/uploads/**",
                     "/api/common/oauth/**", // 第三方 OAuth 核心渲染与回调放行
+                    "/api/common/auth/**",  // 统一安全注册、登录、拉取 RSA 公钥放行
                     "/api/common/public/**",
                     "/swagger-ui/**",
                     "/v3/api-docs/**",

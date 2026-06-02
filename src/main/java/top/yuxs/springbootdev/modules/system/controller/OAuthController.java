@@ -8,6 +8,7 @@
 package top.yuxs.springbootdev.modules.system.controller;
 
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import me.zhyd.oauth.model.AuthCallback;
 import me.zhyd.oauth.model.AuthResponse;
@@ -15,15 +16,20 @@ import me.zhyd.oauth.model.AuthUser;
 import me.zhyd.oauth.request.AuthRequest;
 import me.zhyd.oauth.utils.AuthStateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import top.yuxs.springbootdev.core.common.Result;
+import top.yuxs.springbootdev.core.enums.SocialPlatformEnum;
+import top.yuxs.springbootdev.modules.system.service.SysConfigService;
 import top.yuxs.springbootdev.modules.system.service.SysUserSocialService;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 第三方社交登录与注册 统一控制层
@@ -39,6 +45,51 @@ public class OAuthController {
 
     @Autowired
     private SysUserSocialService sysUserSocialService;
+
+    @Autowired
+    private SysConfigService sysConfigService;
+
+    /**
+     * 获取系统支持且由后台启用的第三方社交登录平台列表
+     * 支持前端动态渲染
+     *
+     * @author YuDongXing
+     * @since 2026/06/01
+     */
+    @GetMapping("/platforms")
+    public Result<List<SocialPlatformVO>> getActivePlatforms() {
+        log.info(">>>>>> 收到前端获取第三方可用登录通道列表请求...");
+        List<SocialPlatformVO> activeList = new ArrayList<>();
+        
+        for (SocialPlatformEnum platform : SocialPlatformEnum.values()) {
+            // 查库获取是否开启及是否配置秘钥
+            String clientId = sysConfigService.getValue(platform.getClientIdKey());
+            String clientSecret = sysConfigService.getValue(platform.getClientSecretKey());
+            String enabledVal = sysConfigService.getValue(platform.getEnabledKey(), "false");
+            
+            boolean enabled = "true".equalsIgnoreCase(enabledVal) 
+                    && StringUtils.hasText(clientId) 
+                    && StringUtils.hasText(clientSecret);
+            
+            SocialPlatformVO vo = new SocialPlatformVO();
+            vo.setCode(platform.getCode());
+            vo.setName(platform.getName());
+            vo.setEnabled(enabled);
+            activeList.add(vo);
+        }
+        
+        return Result.success(activeList);
+    }
+
+    /**
+     * 社交平台可用性返回视图
+     */
+    @Data
+    public static class SocialPlatformVO {
+        private String code;     // 前端标识，如 github, gitee
+        private String name;     // 友好名称，如 GitHub, Gitee
+        private boolean enabled; // 开关状态
+    }
 
     /**
      * 构建授权引导 URL 并返回

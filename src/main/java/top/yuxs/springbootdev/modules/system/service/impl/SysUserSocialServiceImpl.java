@@ -16,15 +16,16 @@ import me.zhyd.oauth.request.AuthGiteeRequest;
 import me.zhyd.oauth.request.AuthGithubRequest;
 import me.zhyd.oauth.request.AuthRequest;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import top.yuxs.springbootdev.core.enums.SocialPlatformEnum;
 import top.yuxs.springbootdev.core.exception.BusinessException;
 import top.yuxs.springbootdev.core.utils.StpUserUtil;
 import top.yuxs.springbootdev.modules.system.entity.SysUser;
 import top.yuxs.springbootdev.modules.system.entity.SysUserSocial;
 import top.yuxs.springbootdev.modules.system.mapper.SysUserSocialMapper;
+import top.yuxs.springbootdev.modules.system.service.SysConfigService;
 import top.yuxs.springbootdev.modules.system.service.SysUserService;
 import top.yuxs.springbootdev.modules.system.service.SysUserSocialService;
 
@@ -39,50 +40,49 @@ import java.util.UUID;
 @Service
 public class SysUserSocialServiceImpl extends ServiceImpl<SysUserSocialMapper, SysUserSocial> implements SysUserSocialService {
 
-    @Value("${justauth.type.github.client-id:}")
-    private String githubClientId;
-    @Value("${justauth.type.github.client-secret:}")
-    private String githubClientSecret;
-    @Value("${justauth.type.github.redirect-uri:}")
-    private String githubRedirectUri;
-
-    @Value("${justauth.type.gitee.client-id:}")
-    private String giteeClientId;
-    @Value("${justauth.type.gitee.client-secret:}")
-    private String giteeClientSecret;
-    @Value("${justauth.type.gitee.redirect-uri:}")
-    private String giteeRedirectUri;
-
     @Autowired
     private SysUserService sysUserService;
 
+    @Autowired
+    private SysConfigService sysConfigService;
+
     @Override
     public AuthRequest getAuthRequest(String source) {
-        if (!StringUtils.hasText(source)) {
-            throw new BusinessException("第三方平台源标志不能为空");
+        SocialPlatformEnum platform = SocialPlatformEnum.getByCode(source);
+        if (platform == null) {
+            throw new BusinessException("系统暂未适配第三方平台: " + source);
         }
-        String platform = source.toLowerCase();
+
+        // 1. 动态从系统通用配置参数表中拉取
+        String clientId = sysConfigService.getValue(platform.getClientIdKey());
+        String clientSecret = sysConfigService.getValue(platform.getClientSecretKey());
+        String redirectUri = sysConfigService.getValue(platform.getRedirectUriKey());
+        String enabled = sysConfigService.getValue(platform.getEnabledKey(), "false");
+
+        // 2. 校验配置是否开启且参数完整
+        if (!"true".equalsIgnoreCase(enabled)) {
+            throw new BusinessException(platform.getName() + " 第三方登录通道已被系统管理员关闭");
+        }
+        if (!StringUtils.hasText(clientId) || !StringUtils.hasText(clientSecret) || !StringUtils.hasText(redirectUri)) {
+            throw new BusinessException("系统未完整配置 " + platform.getName() + " 授权秘钥及回调参数");
+        }
+
+        // 3. 构建对应的 JustAuth 授权对象
         switch (platform) {
-            case "github":
-                if (!StringUtils.hasText(githubClientId)) {
-                    throw new BusinessException("系统未配置 GitHub 第三方登录秘钥参数");
-                }
+            case GITHUB:
                 return new AuthGithubRequest(AuthConfig.builder()
-                        .clientId(githubClientId)
-                        .clientSecret(githubClientSecret)
-                        .redirectUri(githubRedirectUri)
+                        .clientId(clientId)
+                        .clientSecret(clientSecret)
+                        .redirectUri(redirectUri)
                         .build());
-            case "gitee":
-                if (!StringUtils.hasText(giteeClientId)) {
-                    throw new BusinessException("系统未配置 Gitee 第三方登录秘钥参数");
-                }
+            case GITEE:
                 return new AuthGiteeRequest(AuthConfig.builder()
-                        .clientId(giteeClientId)
-                        .clientSecret(giteeClientSecret)
-                        .redirectUri(giteeRedirectUri)
+                        .clientId(clientId)
+                        .clientSecret(clientSecret)
+                        .redirectUri(redirectUri)
                         .build());
             default:
-                throw new BusinessException("本系统暂未适配第三方平台: " + source);
+                throw new BusinessException("本系统暂未适配该社交平台的 Request 组装: " + platform.getName());
         }
     }
 
