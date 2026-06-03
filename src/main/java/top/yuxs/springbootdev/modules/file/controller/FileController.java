@@ -7,11 +7,13 @@
 
 package top.yuxs.springbootdev.modules.file.controller;
 
+import cn.dev33.satoken.stp.StpUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import top.yuxs.springbootdev.core.common.Result;
 import top.yuxs.springbootdev.core.config.file.FileProperties;
+import top.yuxs.springbootdev.core.utils.StpUserUtil;
 import top.yuxs.springbootdev.modules.file.entity.SysFile;
 import top.yuxs.springbootdev.modules.file.service.FileContextService;
 import top.yuxs.springbootdev.modules.file.service.SysFileService;
@@ -53,6 +55,7 @@ public class FileController {
                                  @RequestParam(value = "bizId", required = false) String bizId,
                                  @RequestParam(value = "bizType", required = false) String bizType,
                                  @RequestParam(value = "path", defaultValue = "default") String path) {
+        checkUserOrAdminLogin();
         SysFile sysFile = fileContextService.upload(file, bizId, bizType, path);
         return Result.success(sysFile);
     }
@@ -76,6 +79,7 @@ public class FileController {
     @DeleteMapping("/{id}")
     public Result<?> delete(@PathVariable("id") Long id,
                                @RequestParam(value = "physical", defaultValue = "false") boolean physical) {
+        checkUserOrAdminLogin();
         fileContextService.delete(id, physical);
         return Result.success();
     }
@@ -92,5 +96,18 @@ public class FileController {
             config.put("accessPath", fileProperties.getLocal().getAccessPath());
         }
         return Result.success(config);
+    }
+
+    /**
+     * 显式校验当前请求客户端是否处于登录状态（B端管理员或C端普通用户）
+     */
+    private void checkUserOrAdminLogin() {
+        if (!StpUtil.isLogin() && !StpUserUtil.isLogin()) {
+            throw new cn.dev33.satoken.exception.NotLoginException(
+                    "请登录后执行此操作",
+                    StpUtil.TYPE,
+                    cn.dev33.satoken.exception.NotLoginException.NOT_TOKEN
+            );
+        }
     }
 }

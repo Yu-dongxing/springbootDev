@@ -35,6 +35,8 @@
 ### 3. 动态无注解拦截鉴权 (No-Annotation Security)
 开发人员编写 Controller 业务方法时**无需添加任何权限注解**（如 `@SaCheckPermission`），物理路由在系统启动时通过 Spring 事件机制（监听 `ApplicationReadyEvent`）全自动扫描并增量同步至 `sys_api` 数据库表中。
 安全拦截精细至 `Path + Method` 级别。通过 **Redis 二级高速缓存**（Set 集合 `METHOD:PATH` 规则对碰）进行高并发极速过滤与判定，改动权限即时生效。
+> **安全防护网覆盖**：除精细防护的主管理端 `/api/admin/**` 路由外，系统对公共后台组件路径 `/sys/**`（如系统文件管理 `/sys/file` 和日志接口 `/sys/log`）统一应用同等力度的 B 端管理员会话保护，杜绝了历史接口未受权限拦截器保护的潜在风险。
+
 
 ### 4. 通用社交登录与无感快捷注册 (JustAuth OAuth)
 系统深度集成了第三方登录授权组件 **JustAuth**，并通过 `sys_user_social` 一主多伴表设计，支持一个本地账户绑定多个社交账号（GitHub、Gitee 等）。
@@ -124,6 +126,13 @@ db:
     enabled: true
     base-package: top.yuxs.springbootdev.modules # 扫描业务模块下的实体
 
+# 系统配置自适应初始化器开关（在测试环境下配置为 false 即可跳过对数据库 sys_config 的依赖）
+sys:
+  config:
+    init:
+      enabled: true
+
+
 justauth:
   enabled: true
   type:
@@ -158,8 +167,26 @@ public class User extends BaseEntity {
 
 ---
 
+## 版本与安全更新日志 (Release & Security Log)
+
+### v1.1.0-Security (2026-06-03)
+**「高优先级安全稳定性加固与测试兼容性升级」**
+1. **核心管理路由 `/sys/**` 全面接入网关物理防御**：
+   - 修复了原物理路由 `/sys/**`（包含系统文件管理 `/sys/file` 与操作日志 `/sys/log`）未受安全拦截器防御的问题。
+   - 现已全面将其纳入 B 端管理员的安全网关拦截，任何未登录的请求都将被强力拒之门外，杜绝后台接口裸露风险。
+2. **公共文件上传与删除接口 (`/api/common/file/**`) 双端联合登录防御**：
+   - 针对原有公共接口的越权写入与破坏风险，对文件上传 `/api/common/file/upload` 与物理/逻辑删除 `/api/common/file/{id}` 接口强制实施 **B端/C端联合登录鉴权机制**。
+   - 任何接口调用者必须属于有效的 B端管理员 会话 (`StpUtil`) 或 C端用户 会话 (`StpUserUtil`) 之一。不具备有效 Token 的匿名请求会直接阻断并抛出 `1001` (会话未登录) 错误。
+   - 保持获取存储配置 `GET /api/common/file/config` 与获取详情 `GET /api/common/file/{id}` 接口继续豁免放行，确保免登录场景下的业务平滑与交互友好。
+3. **测试环境 H2 数据库不兼容与自适应配置修复**：
+   - 彻底解决了测试环境下 H2 数据库由于带入 `DEFAULT_NULL_ORDER=FIRST` 导致新版 H2 解析异常、HikariCP 连接池创建失败的偶发崩溃问题。
+   - 为系统配置热加载初始化器 `SysConfigInitRunner` 新增了优雅的条件注解控制，并提供 `sys.config.init.enabled` 属性。在主配置文件中默认开启，在测试环境中显式配置为 `false` 以切断其在测试等特殊环境对 `sys_config` 表及真实数据库连接的前置依赖，恢复无感、飞速的本地自动化测试（`.\mvnw test` 100% BUILD SUCCESS）。
+
+---
+
 ## 愿景
 **Aegis-Boot** 致力于解决传统框架过于臃肿、性能低下、安全配置繁琐的问题。我们通过最先进的 Java 技术栈，为您打造一个更现代、更安全、更丝滑的开发底座。
 
 ---
 **Copyright © 2026 Aegis-Boot Team. All rights reserved.**
+

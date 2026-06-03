@@ -98,8 +98,9 @@ public class SaTokenConfig implements WebMvcConfigurer {
                 return;
             }
 
-            // 2. B 端管理端 (ADMIN) 网关级精细防守与免注解鉴权
-            if (pathMatcher.match("/api/admin/**", path)) {
+            // 2. B 端管理端 (ADMIN/SYS) 网关级精细防守与免注解鉴权
+            if (pathMatcher.match("/api/admin/**", path) || pathMatcher.match("/sys/**", path)) {
+
                 
                 // a. 排除管理端登录鉴权白名单接口
                 if (SaRouter.match("/api/admin/auth/login", "/api/admin/auth/register").isHit()) {
