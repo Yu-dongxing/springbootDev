@@ -15,6 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import top.yuxs.springbootdev.core.common.Result;
+import top.yuxs.springbootdev.core.config.AegisSecurityProperties;
+import top.yuxs.springbootdev.core.exception.BusinessException;
 import top.yuxs.springbootdev.modules.system.service.SysConfigService;
 import top.yuxs.springbootdev.modules.system.service.SysUserService;
 
@@ -36,12 +38,26 @@ public class AuthController {
     @Autowired
     private SysConfigService sysConfigService;
 
+    @Autowired
+    private AegisSecurityProperties securityProperties;
+
+    /**
+     * 获取前端密码传输加密开启状态
+     */
+    @GetMapping("/frontend-encrypt/status")
+    public Result<Boolean> getFrontendEncryptStatus() {
+        return Result.success(securityProperties.isFrontendEncryptEnabled());
+    }
+
     /**
      * 获取用于前端网络传输加密的 RSA 公钥
      * 极防中间人嗅探安全标准
      */
     @GetMapping("/rsa/public-key")
     public Result<String> getRsaPublicKey() {
+        if (!securityProperties.isFrontendEncryptEnabled()) {
+            throw new BusinessException("系统未开启前端密码传输加密服务");
+        }
         String publicKey = sysConfigService.getValue("sys.auth.rsa.public-key");
         if (publicKey == null) {
             log.info(">>>>>> 数据库公钥记录为空，触发自适应热生成高安全 2048 位 RSA 密钥对...");

@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import top.yuxs.springbootdev.core.config.AegisSecurityProperties;
 import top.yuxs.springbootdev.core.exception.BusinessException;
 import top.yuxs.springbootdev.core.utils.StpUserUtil;
 import top.yuxs.springbootdev.modules.system.entity.SysUser;
@@ -38,6 +39,9 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     @Autowired
     private SysConfigService sysConfigService;
 
+    @Autowired
+    private AegisSecurityProperties securityProperties;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void registerUser(String username, String encryptedPassword) {
@@ -52,19 +56,30 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             throw new BusinessException("该用户名已被占用");
         }
 
-        // 2. 解密前端 RSA 密码密文
-        String plainPassword = decryptPassword(encryptedPassword);
+        // 2. 自适应处理前端解密
+        String plainPassword;
+        if (securityProperties.isFrontendEncryptEnabled()) {
+            plainPassword = decryptPassword(encryptedPassword);
+        } else {
+            plainPassword = encryptedPassword; // 禁用前端加密时，入参即为明文
+        }
+        
         if (!StringUtils.hasText(plainPassword) || plainPassword.length() < 6) {
             throw new BusinessException("密码长度不能少于 6 位");
         }
 
-        // 3. BCrypt 哈希加盐持久化
-        String hashed = BCrypt.hashpw(plainPassword, BCrypt.gensalt());
+        // 3. 自适应处理存储加密
+        String finalPassword;
+        if (securityProperties.isPasswordEncryptEnabled()) {
+            finalPassword = BCrypt.hashpw(plainPassword, BCrypt.gensalt());
+        } else {
+            finalPassword = plainPassword; // 禁用密码存储加密，直接明文落库
+        }
 
         // 4. 落库
         SysUser user = new SysUser();
         user.setUsername(username);
-        user.setPassword(hashed);
+        user.setPassword(finalPassword);
         user.setUserType("USER"); // 注册默认为 C 端普通用户
         user.setStatus(0); // 正常启用
         this.save(user);
@@ -88,12 +103,23 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             throw new BusinessException("该账号已被系统禁用，无法登录");
         }
 
-        // 2. 解密前端 RSA 密文
-        String plainPassword = decryptPassword(encryptedPassword);
+        // 2. 自适应前端解密
+        String plainPassword;
+        if (securityProperties.isFrontendEncryptEnabled()) {
+            plainPassword = decryptPassword(encryptedPassword);
+        } else {
+            plainPassword = encryptedPassword;
+        }
 
-        // 3. BCrypt 匹配校验
-        if (!BCrypt.checkpw(plainPassword, user.getPassword())) {
-            throw new BusinessException("用户名或密码错误");
+        // 3. 自适应存储哈希校验
+        if (securityProperties.isPasswordEncryptEnabled()) {
+            if (!BCrypt.checkpw(plainPassword, user.getPassword())) {
+                throw new BusinessException("用户名或密码错误");
+            }
+        } else {
+            if (!plainPassword.equals(user.getPassword())) {
+                throw new BusinessException("用户名或密码错误");
+            }
         }
 
         // 4. 派发 C端 会话 Token 凭证
@@ -119,12 +145,23 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             throw new BusinessException("该管理账号已被禁用");
         }
 
-        // 2. 解密前端 RSA 密文
-        String plainPassword = decryptPassword(encryptedPassword);
+        // 2. 自适应前端解密
+        String plainPassword;
+        if (securityProperties.isFrontendEncryptEnabled()) {
+            plainPassword = decryptPassword(encryptedPassword);
+        } else {
+            plainPassword = encryptedPassword;
+        }
 
-        // 3. BCrypt 匹配校验
-        if (!BCrypt.checkpw(plainPassword, user.getPassword())) {
-            throw new BusinessException("用户名或密码错误");
+        // 3. 自适应存储哈希校验
+        if (securityProperties.isPasswordEncryptEnabled()) {
+            if (!BCrypt.checkpw(plainPassword, user.getPassword())) {
+                throw new BusinessException("用户名或密码错误");
+            }
+        } else {
+            if (!plainPassword.equals(user.getPassword())) {
+                throw new BusinessException("用户名或密码错误");
+            }
         }
 
         // 4. 派发 B端 管理会话 Token 凭证 (StpUtil 隔离 C 端)

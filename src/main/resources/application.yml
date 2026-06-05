@@ -125,8 +125,14 @@ sa-token:
     # 允许的请求方式
     allowed-method: GET, POST, PUT, DELETE
 
-# 自定义业务配置
-# =========================================================
+# 核心安全控制开关 (前端传输非对称加密 & 数据库密码存储单向哈希加密)
+aegis:
+  security:
+    auth:
+      # 是否启用前端传输加密 (若启用，则密码为 RSA 密文进行解密；若禁用，则认为密码为明文传输)
+      frontend-encrypt-enabled: true
+      # 是否启用密码存储加密 (若启用，则落库与登录时均使用高安全 BCrypt 加密匹配；若禁用，则数据库存储明文密码并用等值 equals 匹配)
+      password-encrypt-enabled: true
 
 # Jackson 配置
 jackson:
