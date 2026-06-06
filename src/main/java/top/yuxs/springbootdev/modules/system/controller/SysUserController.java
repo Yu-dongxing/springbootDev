@@ -400,6 +400,63 @@ public class SysUserController {
         return Result.success("密码修改成功，请使用新密码重新登录！");
     }
 
+    /**
+     * 8. 管理员个人自维护：获取个人完整信息 (含基本资料、角色、接口拦截权限清单)
+     */
+    @GetMapping("/profile")
+    public Result<AdminProfileVO> getMyProfile() {
+        Long loginId = StpUtil.getLoginIdAsLong();
+        SysUser user = sysUserService.getById(loginId);
+        if (user == null) {
+            return Result.error(ResultCode.ERROR, "会话已失效，找不到当前登录账户");
+        }
+
+        AdminProfileVO profile = new AdminProfileVO();
+
+        // 1. 基本资料装配
+        SysUserVO uVo = new SysUserVO();
+        uVo.setId(user.getId());
+        uVo.setUsername(user.getUsername());
+        uVo.setUserType(user.getUserType());
+        uVo.setStatus(user.getStatus());
+        uVo.setCreateTime(user.getCreateTime());
+        uVo.setUpdateTime(user.getUpdateTime());
+
+        // 查询社交绑定
+        List<SysUserSocial> socials = sysUserSocialMapper.selectList(
+                new LambdaQueryWrapper<SysUserSocial>().eq(SysUserSocial::getUserId, loginId)
+        );
+        uVo.setSocials(socials);
+
+        // 2. 角色列表装配
+        List<SysUserRole> userRoles = sysUserRoleMapper.selectList(
+                new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getUserId, loginId)
+        );
+        List<SysRole> roles = new ArrayList<>();
+        if (!CollectionUtils.isEmpty(userRoles)) {
+            List<Long> roleIds = userRoles.stream().map(SysUserRole::getRoleId).collect(Collectors.toList());
+            roles = sysRoleMapper.selectList(
+                    new LambdaQueryWrapper<SysRole>().in(SysRole::getId, roleIds)
+            );
+        }
+        uVo.setRoles(roles);
+        profile.setUserInfo(uVo);
+        profile.setRoles(roles);
+
+        // 3. API 权限清单装配
+        Set<String> apiPerms = sysApiService.getApiPermissionsByUserId(loginId);
+        profile.setPermissions(apiPerms);
+
+        return Result.success(profile);
+    }
+
+    @Data
+    public static class AdminProfileVO {
+        private SysUserVO userInfo;
+        private List<SysRole> roles;
+        private Set<String> permissions;
+    }
+
     @Data
     public static class SysUserVO {
         private Long id;
