@@ -11,12 +11,16 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import top.yuxs.springbootdev.modules.system.entity.SysRole;
 import top.yuxs.springbootdev.modules.system.entity.SysUserRole;
+import top.yuxs.springbootdev.modules.system.entity.SysRoleApi;
 import top.yuxs.springbootdev.modules.system.mapper.SysRoleMapper;
 import top.yuxs.springbootdev.modules.system.mapper.SysUserRoleMapper;
+import top.yuxs.springbootdev.modules.system.mapper.SysRoleApiMapper;
 import top.yuxs.springbootdev.modules.system.service.SysRoleService;
+import top.yuxs.springbootdev.modules.system.service.SysApiService;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -32,6 +36,12 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
 
     @Autowired
     private SysUserRoleMapper sysUserRoleMapper;
+
+    @Autowired
+    private SysRoleApiMapper sysRoleApiMapper;
+
+    @Autowired
+    private SysApiService sysApiService;
 
     @Override
     public boolean isSuperAdmin(Long userId) {
@@ -74,5 +84,92 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
                 .map(SysRole::getRoleKey)
                 .distinct()
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void assignApisToRole(Long roleId, List<Long> apiIds) {
+        if (roleId == null) {
+            return;
+        }
+        // 1. 物理清旧绑定
+        sysRoleApiMapper.delete(
+                new LambdaQueryWrapper<SysRoleApi>().eq(SysRoleApi::getRoleId, roleId)
+        );
+
+        // 2. 批量插入新绑定
+        if (!CollectionUtils.isEmpty(apiIds)) {
+            for (Long apiId : apiIds) {
+                SysRoleApi sra = new SysRoleApi();
+                sra.setRoleId(roleId);
+                sra.setApiId(apiId);
+                sysRoleApiMapper.insert(sra);
+            }
+        }
+
+        // 3. 根据 roleId 联合查询所有被授权的用户，依次清空其 Redis 中的网关权限缓存
+        List<SysUserRole> userRoles = sysUserRoleMapper.selectList(
+                new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getRoleId, roleId)
+        );
+        if (!CollectionUtils.isEmpty(userRoles)) {
+            for (SysUserRole ur : userRoles) {
+                sysApiService.clearUserApiCache(ur.getUserId());
+            }
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void assignRolesToUser(Long userId, List<Long> roleIds) {
+        if (userId == null) {
+            return;
+        }
+        // 1. 物理级联清空该用户的旧角色绑定
+        sysUserRoleMapper.delete(
+                new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getUserId, userId)
+        );
+
+        // 2. 保存新角色绑定
+        if (!CollectionUtils.isEmpty(roleIds)) {
+            for (Long roleId : roleIds) {
+                SysUserRole ur = new SysUserRole();
+                ur.setUserId(userId);
+                ur.setRoleId(roleId);
+                sysUserRoleMapper.insert(ur);
+            }
+        }
+
+        // 3. 极速清除该用户的 Redis 网关鉴权缓存
+        sysApiService.clearUserApiCache(userId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteRole(Long roleId) {
+        if (roleId == null) {
+            return;
+        }
+        // 1. 联合查询绑定了此角色的所有用户，用于后续缓存清理
+        List<SysUserRole> userRoles = sysUserRoleMapper.selectList(
+                new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getRoleId, roleId)
+        );
+
+        // 2. 物理删除角色记录
+        this.removeById(roleId);
+
+        // 3. 物理级联清除相关关联记录 sys_role_api, sys_user_role
+        sysRoleApiMapper.delete(
+                new LambdaQueryWrapper<SysRoleApi>().eq(SysRoleApi::getRoleId, roleId)
+        );
+        sysUserRoleMapper.delete(
+                new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getRoleId, roleId)
+        );
+
+        // 4. 清空受影响用户的 Redis 鉴权缓存
+        if (!CollectionUtils.isEmpty(userRoles)) {
+            for (SysUserRole ur : userRoles) {
+                sysApiService.clearUserApiCache(ur.getUserId());
+            }
+        }
     }
 }

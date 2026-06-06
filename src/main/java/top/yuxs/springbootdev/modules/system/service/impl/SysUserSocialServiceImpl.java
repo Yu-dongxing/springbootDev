@@ -19,6 +19,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import top.yuxs.springbootdev.core.config.AegisSecurityProperties;
+import cn.hutool.crypto.digest.BCrypt;
 import top.yuxs.springbootdev.core.enums.SocialPlatformEnum;
 import top.yuxs.springbootdev.core.exception.BusinessException;
 import top.yuxs.springbootdev.core.utils.StpUserUtil;
@@ -45,6 +47,9 @@ public class SysUserSocialServiceImpl extends ServiceImpl<SysUserSocialMapper, S
 
     @Autowired
     private SysConfigService sysConfigService;
+
+    @Autowired
+    private AegisSecurityProperties securityProperties;
 
     @Override
     public AuthRequest getAuthRequest(String source) {
@@ -126,8 +131,17 @@ public class SysUserSocialServiceImpl extends ServiceImpl<SysUserSocialMapper, S
             SysUser newUser = new SysUser();
             // 用户名：生成随机唯一账号
             newUser.setUsername("oauth_" + UUID.randomUUID().toString().substring(0, 8));
-            // 密码：生成一个随机加密UUID作为占位，确保高度安全且无法被破解
-            newUser.setPassword(UUID.randomUUID().toString());
+            
+            // 密码：第三方社交登录默认密码 "Social@123456"，自适应当前系统加密设置
+            String defaultPlainPassword = "Social@123456";
+            String defaultEncryptedPassword;
+            if (securityProperties.isPasswordEncryptEnabled()) {
+                defaultEncryptedPassword = BCrypt.hashpw(defaultPlainPassword, BCrypt.gensalt());
+            } else {
+                defaultEncryptedPassword = defaultPlainPassword;
+            }
+            newUser.setPassword(defaultEncryptedPassword);
+            
             newUser.setUserType("USER"); // 注册为普通 C 端用户
             newUser.setStatus(0); // 账号启用
             

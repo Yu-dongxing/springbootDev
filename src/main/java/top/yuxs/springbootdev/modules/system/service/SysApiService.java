@@ -34,5 +34,10 @@ public interface SysApiService extends IService<SysApi> {
     /**
      * 批量同步物理 API (自动扫描器启动时执行增量幂等更新)
      */
-    void syncApis(List<SysApi> apis);
+     void syncApis(List<SysApi> apis);
+
+    /**
+     * 检查系统核心管理员数据与角色自愈初始化
+     */
+    void checkAndInitDefaultAdminData();
 }

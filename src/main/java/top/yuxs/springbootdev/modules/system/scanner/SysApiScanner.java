@@ -43,6 +43,10 @@ public class SysApiScanner implements ApplicationListener<ApplicationReadyEvent>
 
     @Override
     public void onApplicationEvent(ApplicationReadyEvent event) {
+        this.performScanAndSync();
+    }
+
+    public void performScanAndSync() {
         log.info(">>>>>> 启动 Aegis-Boot 物理 API 全自动扫描注册任务...");
         
         try {
