@@ -89,10 +89,23 @@ public class SysApiServiceImpl extends ServiceImpl<SysApiMapper, SysApi> impleme
                     .map(SysUserRole::getRoleId)
                     .collect(Collectors.toList());
 
-            // Step 2: 根据角色 ID 集合查找关联的 API ID 集合
+            // 过滤掉被禁用的角色（status != 0 的被过滤，只保留 status == 0 的正常角色）
+            List<SysRole> activeRoles = sysRoleMapper.selectList(
+                    new LambdaQueryWrapper<SysRole>()
+                            .in(SysRole::getId, roleIds)
+                            .eq(SysRole::getStatus, 0)
+            );
+            if (CollectionUtils.isEmpty(activeRoles)) {
+                return Set.of();
+            }
+            List<Long> activeRoleIds = activeRoles.stream()
+                    .map(SysRole::getId)
+                    .collect(Collectors.toList());
+
+            // Step 2: 根据活跃角色 ID 集合查找关联的 API ID 集合
             List<SysRoleApi> roleApis = sysRoleApiMapper.selectList(
                     new LambdaQueryWrapper<SysRoleApi>()
-                            .in(SysRoleApi::getRoleId, roleIds)
+                            .in(SysRoleApi::getRoleId, activeRoleIds)
             );
             if (CollectionUtils.isEmpty(roleApis)) {
                 return Set.of();

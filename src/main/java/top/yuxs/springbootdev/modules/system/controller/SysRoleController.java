@@ -130,7 +130,7 @@ public class SysRoleController {
             exist.setStatus(sysRole.getStatus());
         }
         
-        sysRoleService.updateById(exist);
+        sysRoleService.updateRole(exist);
         return Result.success("角色信息更新成功");
     }
 

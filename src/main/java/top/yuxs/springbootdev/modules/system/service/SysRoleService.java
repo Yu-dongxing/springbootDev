@@ -56,4 +56,11 @@ public interface SysRoleService extends IService<SysRole> {
      * @return API ID 列表
      */
     List<Long> getApiIdsByRoleId(Long roleId);
+
+    /**
+     * 级联更新角色信息 (并同步极速清理属于该角色的关联用户的网关权限缓存，保证权限实时自愈生效)
+     * @param sysRole 待更新角色实体
+     * @return 是否更新成功
+     */
+    boolean updateRole(SysRole sysRole);
 }

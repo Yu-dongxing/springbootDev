@@ -183,4 +183,25 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         );
         return list.stream().map(SysRoleApi::getApiId).collect(Collectors.toList());
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean updateRole(SysRole sysRole) {
+        if (sysRole == null || sysRole.getId() == null) {
+            return false;
+        }
+        boolean success = this.updateById(sysRole);
+        if (success) {
+            // 极速清理所有属于该角色的用户的鉴权缓存，保障修改角色（如禁用、删除等）能够瞬间触发自愈
+            List<SysUserRole> userRoles = sysUserRoleMapper.selectList(
+                    new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getRoleId, sysRole.getId())
+            );
+            if (!CollectionUtils.isEmpty(userRoles)) {
+                for (SysUserRole ur : userRoles) {
+                    sysApiService.clearUserApiCache(ur.getUserId());
+                }
+            }
+        }
+        return success;
+    }
 }
