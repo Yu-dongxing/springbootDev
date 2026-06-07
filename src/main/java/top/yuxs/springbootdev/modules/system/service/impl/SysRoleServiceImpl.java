@@ -172,4 +172,15 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
             }
         }
     }
+
+    @Override
+    public List<Long> getApiIdsByRoleId(Long roleId) {
+        if (roleId == null) {
+            return List.of();
+        }
+        List<SysRoleApi> list = sysRoleApiMapper.selectList(
+                new LambdaQueryWrapper<SysRoleApi>().eq(SysRoleApi::getRoleId, roleId)
+        );
+        return list.stream().map(SysRoleApi::getApiId).collect(Collectors.toList());
+    }
 }

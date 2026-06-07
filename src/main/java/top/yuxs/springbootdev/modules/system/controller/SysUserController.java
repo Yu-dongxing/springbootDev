@@ -179,19 +179,31 @@ public class SysUserController {
         }
         
         sysUser.setUsername(sysUser.getUsername().trim());
-        sysUser.setUserType("ADMIN"); // 强制为管理端用户
+        if (StringUtils.hasText(sysUser.getUserType())) {
+            sysUser.setUserType(sysUser.getUserType().toUpperCase());
+        } else {
+            sysUser.setUserType("ADMIN"); // 默认依旧是 ADMIN
+        }
         if (sysUser.getStatus() == null) {
             sysUser.setStatus(0); // 默认启用
         }
         
         // 密码哈希自适应
         String rawPassword = sysUser.getPassword();
+        if (securityProperties.isFrontendEncryptEnabled()) {
+            rawPassword = sysUserService.decryptPassword(rawPassword);
+        }
+        if (!StringUtils.hasText(rawPassword) || rawPassword.length() < 6) {
+            return Result.error(ResultCode.PARAM_IS_INVALID, "初始密码长度不能少于 6 位");
+        }
         if (securityProperties.isPasswordEncryptEnabled()) {
             sysUser.setPassword(BCrypt.hashpw(rawPassword, BCrypt.gensalt()));
+        } else {
+            sysUser.setPassword(rawPassword);
         }
         
         sysUserService.save(sysUser);
-        return Result.success("管理员账号新增成功");
+        return Result.success("账号新增成功");
     }
 
     /**
@@ -264,6 +276,12 @@ public class SysUserController {
         }
         
         String newPassword = param.getNewPassword();
+        if (securityProperties.isFrontendEncryptEnabled()) {
+            newPassword = sysUserService.decryptPassword(newPassword);
+        }
+        if (!StringUtils.hasText(newPassword) || newPassword.length() < 6) {
+            return Result.error(ResultCode.PARAM_IS_INVALID, "新密码长度不能少于 6 位");
+        }
         if (securityProperties.isPasswordEncryptEnabled()) {
             exist.setPassword(BCrypt.hashpw(newPassword, BCrypt.gensalt()));
         } else {
@@ -371,6 +389,9 @@ public class SysUserController {
         // 比对旧密码（碰撞校验）
         String dbPassword = exist.getPassword();
         String oldPassword = param.getOldPassword();
+        if (securityProperties.isFrontendEncryptEnabled()) {
+            oldPassword = sysUserService.decryptPassword(oldPassword);
+        }
         
         boolean match = false;
         if (securityProperties.isPasswordEncryptEnabled()) {
@@ -385,6 +406,12 @@ public class SysUserController {
         
         // 更新为新密码
         String newPassword = param.getNewPassword();
+        if (securityProperties.isFrontendEncryptEnabled()) {
+            newPassword = sysUserService.decryptPassword(newPassword);
+        }
+        if (!StringUtils.hasText(newPassword) || newPassword.length() < 6) {
+            return Result.error(ResultCode.PARAM_IS_INVALID, "新密码长度不能少于 6 位");
+        }
         if (securityProperties.isPasswordEncryptEnabled()) {
             exist.setPassword(BCrypt.hashpw(newPassword, BCrypt.gensalt()));
         } else {

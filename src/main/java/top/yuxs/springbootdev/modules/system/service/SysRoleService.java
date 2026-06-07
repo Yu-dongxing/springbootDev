@@ -49,4 +49,11 @@ public interface SysRoleService extends IService<SysRole> {
      * @param roleId 角色ID
      */
     void deleteRole(Long roleId);
+
+    /**
+     * 根据角色ID获取已绑定的物理 API 接口 ID 列表
+     * @param roleId 角色ID
+     * @return API ID 列表
+     */
+    List<Long> getApiIdsByRoleId(Long roleId);
 }

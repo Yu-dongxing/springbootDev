@@ -8,6 +8,10 @@
 package top.yuxs.springbootdev.modules.system.aspect;
 
 import cn.dev33.satoken.stp.StpUtil;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import top.yuxs.springbootdev.modules.system.entity.SysUser;
+import top.yuxs.springbootdev.modules.system.service.SysUserService;
 import com.alibaba.fastjson2.JSON;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -47,6 +51,10 @@ public class AegisLogAspect {
 
     private final ApplicationEventPublisher eventPublisher;
 
+    @Autowired
+    @Lazy
+    private SysUserService sysUserService;
+
     public AegisLogAspect(ApplicationEventPublisher eventPublisher) {
         this.eventPublisher = eventPublisher;
     }
@@ -85,10 +93,14 @@ public class AegisLogAspect {
 
         // 3. 抓取当前登录人信息 (ID, 用户名, 角色)
         try {
-            if (StpUtil.isLogin()) {
-                sysLog.setUserId(StpUtil.getLoginIdAsLong());
+            String requestUri = sysLog.getUrl() != null ? sysLog.getUrl() : "";
+            boolean isAuthEndpoint = requestUri.contains("/auth/") || requestUri.contains("/login") || requestUri.contains("/register");
+
+            if (StpUtil.isLogin() && !isAuthEndpoint) {
+                long userId = StpUtil.getLoginIdAsLong();
+                sysLog.setUserId(userId);
                 
-                // 安全获取用户名：尝试从 SaSession 获取缓存的 username，获取不到则默认使用登录账号名
+                // 安全获取用户名：尝试从 SaSession 获取缓存的 username，获取不到则从数据库查询并缓存
                 String username = null;
                 try {
                     if (StpUtil.getSession(false) != null) {
@@ -96,7 +108,22 @@ public class AegisLogAspect {
                     }
                 } catch (Exception ignored) {}
                 
-                sysLog.setUsername(username != null ? username : StpUtil.getLoginId().toString());
+                if (username == null || username.isBlank() || username.equals(String.valueOf(userId))) {
+                    try {
+                        if (sysUserService != null) {
+                            SysUser user = sysUserService.getById(userId);
+                            if (user != null) {
+                                username = user.getUsername();
+                                // 主动缓存回 SaSession，下一次就不用查库了
+                                if (StpUtil.getSession(false) != null && username != null) {
+                                    StpUtil.getSession().set("username", username);
+                                }
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                }
+                
+                sysLog.setUsername((username != null && !username.isBlank()) ? username : String.valueOf(userId));
                 
                 // 获取用户角色，拼接成逗号分割的字符串
                 try {
@@ -105,9 +132,17 @@ public class AegisLogAspect {
                     sysLog.setUserRole("default_role");
                 }
             } else {
-                // 未登录/访客状态
+                // 未登录/访客状态，或者当前是登录、注册、OAuth 等鉴权核心端点
                 sysLog.setUsername("访客");
                 sysLog.setUserRole("visitor");
+                
+                // 自适应防护：尝试提取请求入参中的用户名作为本次操作审计的操作员展示
+                try {
+                    String extractedUsername = extractUsernameFromParams(joinPoint);
+                    if (extractedUsername != null && !extractedUsername.isBlank()) {
+                        sysLog.setUsername(extractedUsername + " (尝试/访客)");
+                    }
+                } catch (Exception ignored) {}
             }
         } catch (Exception e) {
             // 防御式：防止由于 Sa-Token 依赖或上下文未完成等原因阻碍核心业务流程
@@ -125,6 +160,7 @@ public class AegisLogAspect {
 
         // 5. 校验拦截开关注解
         AegisLog aegisLog = method.getAnnotation(AegisLog.class);
+        boolean needSave = (aegisLog != null); // 只有标注了 @AegisLog 的方法才默认保存日志
         boolean saveRequest = true;
         boolean saveResponse = true;
 
@@ -157,22 +193,38 @@ public class AegisLogAspect {
             return result;
         } catch (Throwable e) {
             sysLog.setStatus(0); // 失败
-            sysLog.setErrorMsg(getStackTrace(e));
-            sysLog.setResult(e.getMessage());
+            String errorMsg = getStackTrace(e);
+            String resultStr = e.getMessage();
+
+            // 自适应提取：如果属于受安全物理隔离保护的业务拦截异常，将其内部隐藏的审计日志细节提取录入，并在后台日志审计雷达中精准展示
+            if (e instanceof top.yuxs.springbootdev.core.exception.BusinessException) {
+                top.yuxs.springbootdev.core.exception.BusinessException be = (top.yuxs.springbootdev.core.exception.BusinessException) e;
+                if (be.getAuditMessage() != null && !be.getAuditMessage().isBlank()) {
+                    resultStr = be.getAuditMessage();
+                    errorMsg = "[神盾安全防护中心拦截警报]\n" + be.getAuditMessage() + "\n\n[异常详细堆栈信息]\n" + errorMsg;
+                    // 特异高危安全拦截穿透：即使接口方法本身无 @AegisLog 注解标记，只要拦截到此高敏感跨端隔离警告，也必须穿透策略强制保存日志！
+                    needSave = true;
+                }
+            }
+
+            sysLog.setErrorMsg(errorMsg);
+            sysLog.setResult(resultStr);
             throw e; // 继续向上抛出，保证系统的全局异常处理器捕获，以及 Spring 数据库事务能够回滚
         } finally {
             // 7. 计算方法耗时
             long takeTime = System.currentTimeMillis() - startTime;
             sysLog.setTakeTime(takeTime);
 
-            // 8. 兜底解析：当没有标 AegisLog 注解时，自动推导接口名称和操作类型
-            deriveLogMetadata(sysLog, className, methodName);
+            if (needSave) {
+                // 8. 兜底解析：当没有标 AegisLog 注解时，自动推导接口名称和操作类型
+                deriveLogMetadata(sysLog, className, methodName);
 
-            // 9. 发送解耦异步落库事件，利用基于 Java 21 虚拟线程池的监听器非阻塞存储
-            try {
-                eventPublisher.publishEvent(new AegisLogEvent(this, sysLog));
-            } catch (Exception ex) {
-                log.error("发布接口系统操作日志事件失败！", ex);
+                // 9. 发送解耦异步落库事件，利用基于 Java 21 虚拟线程池的监听器非阻塞存储
+                try {
+                    eventPublisher.publishEvent(new AegisLogEvent(this, sysLog));
+                } catch (Exception ex) {
+                    log.error("发布接口系统操作日志事件失败！", ex);
+                }
             }
         }
     }
@@ -259,6 +311,37 @@ public class AegisLogAspect {
         if (lower.contains("upload")) return "上传文件/媒体";
         if (lower.contains("download") || lower.contains("export")) return "文件导出与下载";
         return name; // 无特征返回原样
+    }
+
+    /**
+     * 从登录、注册等核心端点的方法参数中尝试提取用户名
+     */
+    private String extractUsernameFromParams(ProceedingJoinPoint joinPoint) {
+        Object[] args = joinPoint.getArgs();
+        if (args == null || args.length == 0) {
+            return null;
+        }
+        for (Object arg : args) {
+            if (arg == null) {
+                continue;
+            }
+            try {
+                String json = JSON.toJSONString(arg);
+                com.alibaba.fastjson2.JSONObject jsonObject = JSON.parseObject(json);
+                if (jsonObject != null) {
+                    if (jsonObject.containsKey("username")) {
+                        return jsonObject.getString("username");
+                    }
+                    if (jsonObject.containsKey("sysUser")) {
+                        com.alibaba.fastjson2.JSONObject u = jsonObject.getJSONObject("sysUser");
+                        if (u != null && u.containsKey("username")) {
+                            return u.getString("username");
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+        return null;
     }
 
     /**

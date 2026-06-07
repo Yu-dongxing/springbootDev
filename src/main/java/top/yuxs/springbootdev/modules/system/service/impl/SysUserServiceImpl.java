@@ -96,10 +96,21 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
                 .eq(SysUser::getUsername, username)
                 .eq(SysUser::getUserType, "USER"));
         if (user == null) {
+            // 防御式探测：检查该账户是否存在但 userType 错位
+            SysUser anyUser = this.getOne(new LambdaQueryWrapper<SysUser>()
+                    .eq(SysUser::getUsername, username));
+            if (anyUser != null) {
+                String auditMsg = ">>>>>> [Aegis Auth Guard] 拦截到跨端登录尝试！检测到该账户存在，但物理隔离拦截激活。账户名: [" + username + "], 当前库中实际类型: [" + anyUser.getUserType() + "], 请求的端点通道: [C 端普通用户 (USER)]";
+                log.warn(auditMsg);
+                throw new BusinessException("用户名或密码错误", auditMsg);
+            } else {
+                log.warn(">>>>>> [Aegis Auth Guard] 登录失败：在 [C 端普通用户 (USER)] 中未检索到名称为 [{}] 的账户", username);
+            }
             throw new BusinessException("用户名或密码错误");
         }
 
         if (user.getStatus() != null && user.getStatus() == 1) {
+            log.warn(">>>>>> [Aegis Auth Guard] 该普通用户账号 [{}] 已被系统禁用，拒绝登录", username);
             throw new BusinessException("该账号已被系统禁用，无法登录");
         }
 
@@ -114,16 +125,23 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         // 3. 自适应存储哈希校验
         if (securityProperties.isPasswordEncryptEnabled()) {
             if (!BCrypt.checkpw(plainPassword, user.getPassword())) {
+                log.warn(">>>>>> [Aegis Auth Guard] 密码哈希不匹配！C 端用户 [{}] 登录失败 (当前启用了 BCrypt 安全散列存储)", username);
                 throw new BusinessException("用户名或密码错误");
             }
         } else {
             if (!plainPassword.equals(user.getPassword())) {
+                log.warn(">>>>>> [Aegis Auth Guard] 密码等值校验不匹配！C 端用户 [{}] 登录失败 (当前禁用了哈希，使用明文存储等值比对)", username);
                 throw new BusinessException("用户名或密码错误");
             }
         }
 
         // 4. 派发 C端 会话 Token 凭证
         StpUserUtil.login(user.getId());
+        try {
+            StpUserUtil.stpLogic.getSession().set("username", user.getUsername());
+        } catch (Exception e) {
+            log.error("写入用户端 SaSession 缓存用户名异常", e);
+        }
         return StpUserUtil.getTokenValue();
     }
 
@@ -138,10 +156,21 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
                 .eq(SysUser::getUsername, username)
                 .eq(SysUser::getUserType, "ADMIN"));
         if (user == null) {
+            // 防御式探测：检查该账户是否存在但 userType 错位
+            SysUser anyUser = this.getOne(new LambdaQueryWrapper<SysUser>()
+                    .eq(SysUser::getUsername, username));
+            if (anyUser != null) {
+                String auditMsg = ">>>>>> [Aegis Auth Guard] 拦截到跨端登录尝试！检测到该账户存在，但物理隔离拦截激活。账户名: [" + username + "], 当前库中实际类型: [" + anyUser.getUserType() + "], 请求的端点通道: [B 端管理后台 (ADMIN)]";
+                log.warn(auditMsg);
+                throw new BusinessException("用户名或密码错误", auditMsg);
+            } else {
+                log.warn(">>>>>> [Aegis Auth Guard] 登录失败：在 [B 端管理后台 (ADMIN)] 中未检索到名称为 [{}] 的账户", username);
+            }
             throw new BusinessException("用户名或密码错误");
         }
 
         if (user.getStatus() != null && user.getStatus() == 1) {
+            log.warn(">>>>>> [Aegis Auth Guard] 该管理员账号 [{}] 已被系统禁用，拒绝登录", username);
             throw new BusinessException("该管理账号已被禁用");
         }
 
@@ -156,16 +185,23 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         // 3. 自适应存储哈希校验
         if (securityProperties.isPasswordEncryptEnabled()) {
             if (!BCrypt.checkpw(plainPassword, user.getPassword())) {
+                log.warn(">>>>>> [Aegis Auth Guard] 密码哈希不匹配！管理员 [{}] 登录失败 (当前启用了 BCrypt 安全散列存储)", username);
                 throw new BusinessException("用户名或密码错误");
             }
         } else {
             if (!plainPassword.equals(user.getPassword())) {
+                log.warn(">>>>>> [Aegis Auth Guard] 密码等值校验不值匹配！管理员 [{}] 登录失败 (当前禁用了哈希，使用明文存储等值比对)", username);
                 throw new BusinessException("用户名或密码错误");
             }
         }
 
         // 4. 派发 B端 管理会话 Token 凭证 (StpUtil 隔离 C 端)
         StpUtil.login(user.getId());
+        try {
+            StpUtil.getSession().set("username", user.getUsername());
+        } catch (Exception e) {
+            log.error("写入管理端 SaSession 缓存用户名异常", e);
+        }
         return StpUtil.getTokenValue();
     }
 

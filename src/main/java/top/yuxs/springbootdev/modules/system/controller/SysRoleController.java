@@ -183,6 +183,21 @@ public class SysRoleController {
         return Result.success("分配系统角色成功，该用户的鉴权缓存已实时重置。");
     }
 
+    /**
+     * 7. 获取指定角色已绑定的物理 API 接口 ID 列表
+     */
+    @GetMapping("/api-ids/{roleId}")
+    public Result<List<String>> getRoleApiIds(@PathVariable Long roleId) {
+        if (roleId == null) {
+            return Result.error(ResultCode.PARAM_IS_INVALID, "角色ID不能为空");
+        }
+        List<Long> apiIds = sysRoleService.getApiIdsByRoleId(roleId);
+        List<String> apiIdStrs = apiIds.stream()
+                .map(String::valueOf)
+                .toList();
+        return Result.success(apiIdStrs);
+    }
+
     @Data
     public static class AssignApisParam {
         private Long roleId;

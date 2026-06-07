@@ -107,6 +107,9 @@ public class UserCenterController {
         // 校验旧密码
         String dbPassword = exist.getPassword();
         String oldPassword = param.getOldPassword();
+        if (securityProperties.isFrontendEncryptEnabled()) {
+            oldPassword = sysUserService.decryptPassword(oldPassword);
+        }
         
         boolean match = false;
         if (securityProperties.isPasswordEncryptEnabled()) {
@@ -121,6 +124,13 @@ public class UserCenterController {
         
         // 密码哈希落库自适应
         String newPassword = param.getNewPassword();
+        if (securityProperties.isFrontendEncryptEnabled()) {
+            newPassword = sysUserService.decryptPassword(newPassword);
+        }
+        if (!StringUtils.hasText(newPassword) || newPassword.length() < 6) {
+            return Result.error(ResultCode.PARAM_IS_INVALID, "新密码长度不能少于 6 位");
+        }
+        
         if (securityProperties.isPasswordEncryptEnabled()) {
             exist.setPassword(BCrypt.hashpw(newPassword, BCrypt.gensalt()));
         } else {
