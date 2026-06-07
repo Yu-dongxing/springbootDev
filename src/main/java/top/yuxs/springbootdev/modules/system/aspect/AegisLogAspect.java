@@ -91,11 +91,11 @@ public class AegisLogAspect {
             sysLog.setMethod(request.getMethod());
         }
 
+        String requestUri = sysLog.getUrl() != null ? sysLog.getUrl() : "";
+        boolean isAuthEndpoint = requestUri.contains("/auth/") || requestUri.contains("/login") || requestUri.contains("/register");
+
         // 3. 抓取当前登录人信息 (ID, 用户名, 角色)
         try {
-            String requestUri = sysLog.getUrl() != null ? sysLog.getUrl() : "";
-            boolean isAuthEndpoint = requestUri.contains("/auth/") || requestUri.contains("/login") || requestUri.contains("/register");
-
             if (StpUtil.isLogin() && !isAuthEndpoint) {
                 long userId = StpUtil.getLoginIdAsLong();
                 sysLog.setUserId(userId);
@@ -160,7 +160,7 @@ public class AegisLogAspect {
 
         // 5. 校验拦截开关注解
         AegisLog aegisLog = method.getAnnotation(AegisLog.class);
-        boolean needSave = (aegisLog != null); // 只有标注了 @AegisLog 的方法才默认保存日志
+        boolean needSave = (aegisLog != null) || !isAuthEndpoint; // 标注了 @AegisLog 或者是普通业务接口（非登录注册等鉴权核心端点）默认都保存日志
         boolean saveRequest = true;
         boolean saveResponse = true;
 
