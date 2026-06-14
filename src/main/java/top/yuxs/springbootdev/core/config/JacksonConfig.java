@@ -28,9 +28,9 @@ public class JacksonConfig {
     @Bean
     public Module jacksonModule() {
         SimpleModule module = new SimpleModule();
-        // 将 Long 和 BigInteger 类型在序列化时自动转为 String 类型
-        module.addSerializer(Long.class, ToStringSerializer.instance);
-        module.addSerializer(Long.TYPE, ToStringSerializer.instance);
+        // 使用更智能的 SmartLongSerializer，避免将所有小 Long 字段一刀切转为 String 破坏接口纯净性
+        module.addSerializer(Long.class, SmartLongSerializer.instance);
+        module.addSerializer(Long.TYPE, SmartLongSerializer.instance);
         module.addSerializer(BigInteger.class, ToStringSerializer.instance);
         return module;
     }
