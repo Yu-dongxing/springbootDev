@@ -57,4 +57,28 @@ public class MyWebMvcConfig implements WebMvcConfigurer {
         registry.addResourceHandler(accessPath)
                 .addResourceLocations(resourceLocation);
     }
+
+    /**
+     * 在全局 HttpMessageConverter 最底层强制装配自定义 SmartLongSerializer 策略
+     * 解决 Spring Boot 自动装配可能在特定环境（如第三方库覆盖 ObjectMapper）下失效的顽疾，
+     * 彻底、无死角地保证所有 Spring MVC 返回大数时都被智能序列化为 String 类型。
+     */
+    @Override
+    public void extendMessageConverters(java.util.List<org.springframework.http.converter.HttpMessageConverter<?>> converters) {
+        for (org.springframework.http.converter.HttpMessageConverter<?> converter : converters) {
+            if (converter instanceof org.springframework.http.converter.json.MappingJackson2HttpMessageConverter) {
+                com.fasterxml.jackson.databind.ObjectMapper objectMapper = 
+                        ((org.springframework.http.converter.json.MappingJackson2HttpMessageConverter) converter).getObjectMapper();
+                
+                com.fasterxml.jackson.databind.module.SimpleModule module = new com.fasterxml.jackson.databind.module.SimpleModule();
+                // 1. 注入智能 Long 序列化器
+                module.addSerializer(Long.class, SmartLongSerializer.instance);
+                module.addSerializer(Long.TYPE, SmartLongSerializer.instance);
+                // 2. 注入 BigInteger 序列化器
+                module.addSerializer(java.math.BigInteger.class, com.fasterxml.jackson.databind.ser.std.ToStringSerializer.instance);
+                
+                objectMapper.registerModule(module);
+            }
+        }
+    }
 }
