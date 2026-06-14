@@ -267,7 +267,7 @@ public class OAuthController {
                             right: 0;
                             bottom: 0;
                             border-radius: 50%;
-                            background: %s;
+                            background: {accentColor};
                             padding: 3px;
                             animation: rotateBorder 12s linear infinite;
                         }
@@ -300,7 +300,7 @@ public class OAuthController {
                             letter-spacing: 1.5px;
                             margin-bottom: 12px;
                             color: #ffffff;
-                            background-color: %s;
+                            background-color: {platformColor};
                             border: 1px solid rgba(255, 255, 255, 0.15);
                             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
                         }
@@ -425,18 +425,18 @@ public class OAuthController {
                         <div class="avatar-wrapper">
                             <div class="avatar-gradient-border"></div>
                             <div class="avatar-inner">
-                                <img class="avatar-img" src="%s" alt="Social Avatar" onerror="this.src='https://api.dicebear.com/7.x/bottts/svg?seed=Aegis'">
+                                <img class="avatar-img" src="{avatarUrl}" alt="Social Avatar" onerror="this.src='https://api.dicebear.com/7.x/bottts/svg?seed=Aegis'">
                             </div>
                         </div>
 
-                        <span class="platform-badge">%s 授权成功</span>
-                        <h1>欢迎，<span class="nickname">%s</span></h1>
+                        <span class="platform-badge">{platformName} 授权成功</span>
+                        <h1>欢迎，<span class="nickname">{nickname}</span></h1>
                         <p class="subtitle">您的账户已成功免密注册并安全绑定本地系统</p>
 
                         <div class="token-section">
                             <span class="token-label">本地会话凭证 (Token)</span>
                             <div class="token-display-container">
-                                <div class="token-value" id="tokenText">%s</div>
+                                <div class="token-value" id="tokenText">{token}</div>
                                 <button class="copy-btn" id="copyBtn" onclick="copyToken()">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                                     <span>复制</span>
@@ -446,7 +446,7 @@ public class OAuthController {
 
                         <div class="tip-box">
                             💡 <strong>下一步操作提示：</strong><br>
-                            该 Token 代表您在 C 端的专属会话状态。您可以将其添加到请求头 <code>satoken: %s</code>，以便安全调用 C 端 <code>/api/user/**</code> 受限业务接口。
+                            该 Token 代表您在 C 端的专属会话状态。您可以将其添加到请求头 <code>satoken: {token}</code>，以便安全调用 C 端 <code>/api/user/**</code> 受限业务接口。
                         </div>
 
                         <div class="close-tip">
@@ -455,6 +455,34 @@ public class OAuthController {
                     </div>
 
                     <script>
+                        // 自动向父窗口投递 Token 并关闭弹窗 (2026 极速无感自适应信道)
+                        (function() {
+                            const tokenVal = document.getElementById('tokenText').innerText.trim();
+                            if (window.opener && tokenVal) {
+                                try {
+                                    // 向父窗口投递成功消息
+                                    window.opener.postMessage({
+                                        type: 'oauth-token-success',
+                                        token: tokenVal
+                                    }, '*');
+                                    
+                                    // 界面提示自动关闭中
+                                    const closeTip = document.querySelector('.close-tip');
+                                    if (closeTip) {
+                                        closeTip.innerHTML = '✨ <strong>授权成功！密钥已安全对碰，正在自动关闭窗口...</strong>';
+                                        closeTip.style.color = '#10b981';
+                                    }
+                                    
+                                    // 延迟 600ms 平滑关闭，留出视觉过渡时间
+                                    setTimeout(function() {
+                                        window.close();
+                                    }, 600);
+                                } catch (e) {
+                                    console.error('postMessage error:', e);
+                                }
+                            }
+                        })();
+
                         function copyToken() {
                             const tokenVal = document.getElementById('tokenText').innerText;
                             navigator.clipboard.writeText(tokenVal).then(() => {
@@ -477,7 +505,13 @@ public class OAuthController {
                 </html>
                 """;
 
-        return String.format(template, accentColor, platformColor, authUser.getAvatar(), platformName, authUser.getNickname(), token, token);
+        return template
+                .replace("{accentColor}", accentColor)
+                .replace("{platformColor}", platformColor)
+                .replace("{avatarUrl}", authUser.getAvatar() != null ? authUser.getAvatar() : "")
+                .replace("{platformName}", platformName)
+                .replace("{nickname}", authUser.getNickname() != null ? authUser.getNickname() : "")
+                .replace("{token}", token);
     }
 
     /**
@@ -586,19 +620,38 @@ public class OAuthController {
                         <div class="error-icon-wrapper">
                             <svg class="error-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
                         </div>
-                        <h1>%s 授权登录失败</h1>
+                        <h1>{platformName} 授权登录失败</h1>
                         <p class="subtitle">在与第三方 OAuth 平台握手时发生未知异常</p>
                         
                         <div class="error-details">
                             <strong>ERROR:</strong><br>
-                            %s
+                            {errorMsg}
                         </div>
 
                         <a href="javascript:history.back()" class="back-btn">重新尝试授权</a>
                     </div>
+
+                    <script>
+                        // 自动向父窗口投递错误消息 (2026 智能反馈通道)
+                        (function() {
+                            const errorDetails = document.querySelector('.error-details').innerText;
+                            if (window.opener) {
+                                try {
+                                    window.opener.postMessage({
+                                        type: 'oauth-token-error',
+                                        message: errorDetails || '授权登录失败'
+                                    }, '*');
+                                } catch (e) {
+                                    console.error('postMessage error:', e);
+                                }
+                            }
+                        })();
+                    </script>
                 </body>
                 </html>
                 """;
-        return String.format(template, platformName, errorMsg);
+        return template
+                .replace("{platformName}", platformName)
+                .replace("{errorMsg}", errorMsg != null ? errorMsg : "未知异常");
     }
 }

@@ -325,6 +325,12 @@ public class AegisLogAspect {
             if (arg == null) {
                 continue;
             }
+            // 拦截排除 Servlet 原生内置对象和多媒体文件，避免因 Fastjson 反射其 getOutputStream() 导致后续 getWriter() 报错
+            if (arg instanceof HttpServletRequest || arg instanceof HttpServletResponse 
+                    || arg instanceof MultipartFile || arg instanceof MultipartFile[]
+                    || arg instanceof org.springframework.validation.BindingResult) {
+                continue;
+            }
             try {
                 String json = JSON.toJSONString(arg);
                 com.alibaba.fastjson2.JSONObject jsonObject = JSON.parseObject(json);
