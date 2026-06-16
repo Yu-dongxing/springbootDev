@@ -167,6 +167,20 @@ public class User extends BaseEntity {
 
 ---
 
+## 前端与第三方对接指引
+
+为了方便前端团队、移动端开发人员或第三方协同系统无缝接入 **Aegis-Boot (神盾)** 现代安全架构（包括 RSA 散列非对称密码传输、双端物理会话隔离、雪花 ID 高精度处理、零成本动态枚举绑定等机制），项目根目录下已经为您整理并准备了一份极具生产级实战价值的对接规格说明书：
+
+👉 **[前端对接与物理 API 接口详细规格说明书 (API.md)](file:///d:/CodeProject/DevelopmentProjects/springbootDev/API.md)**
+
+该文档为您准备了：
+- **密码非对称 RSA 加密**在前端的配置流程及 `jsencrypt` 代码示例；
+- **B端 (`StpUtil`) 与 C端 (`StpUserUtil`) 强隔离登录态**透出及 Token 交互细节；
+- **雪花 ID 自动转 String 防精度丢失机制**下、上行无损适配；
+- **一键式 Axios 统一拦截器模板**（开箱即用，已集成会话失效、RSA公钥自动置换及拦截对碰等业务流程）。
+
+---
+
 ## 版本与安全更新日志 (Release & Security Log)
 
 ### v1.2.0-Security (2026-06-07)
