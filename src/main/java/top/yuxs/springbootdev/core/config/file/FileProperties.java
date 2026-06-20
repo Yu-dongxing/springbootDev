@@ -38,6 +38,11 @@ public class FileProperties {
      */
     private AliyunConfig aliyun = new AliyunConfig();
 
+    /**
+     * MinIO 存储配置
+     */
+    private MinioConfig minio = new MinioConfig();
+
     @Data
     public static class LocalConfig {
         /**
@@ -76,5 +81,33 @@ public class FileProperties {
          * SecretKey
          */
         private String secretKey;
+    }
+
+    @Data
+    public static class MinioConfig {
+        /**
+         * 访问域名 (用于外网或CDN直链接入)
+         */
+        private String domain;
+        /**
+         * 端点 (API服务器地址)
+         */
+        private String endpoint;
+        /**
+         * 存储桶名称
+         */
+        private String bucketName;
+        /**
+         * AccessKey
+         */
+        private String accessKey;
+        /**
+         * SecretKey
+         */
+        private String secretKey;
+        /**
+         * 是否自动创建存储桶 (默认 true)
+         */
+        private Boolean autoCreateBucket = true;
     }
 }

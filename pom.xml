@@ -57,6 +57,8 @@
         <disruptor.version>3.4.4</disruptor.version>
         <!-- JustAuth 版本 -->
         <justauth.version>1.16.7</justauth.version>
+        <!-- MinIO SDK 版本 -->
+        <minio.version>8.5.12</minio.version>
     </properties>
 
     <dependencies>
@@ -188,6 +190,13 @@
 
 
         <!-- ==================== 工具类与其他 ==================== -->
+
+        <!-- MinIO SDK：用于对象存储接入 -->
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>${minio.version}</version>
+        </dependency>
 
         <!-- Lombok：通过注解简化 Java 代码，减少 getter/setter 等模板代码 -->
         <dependency>

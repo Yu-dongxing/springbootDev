@@ -25,3 +25,14 @@ sys:
     init:
       enabled: false
 
+# 测试环境下文件上传的基础配置
+file:
+  active: ${FILE_STORAGE_ACTIVE:LOCAL}
+  minio:
+    endpoint: ${MINIO_ENDPOINT:http://127.0.0.1:9000}
+    bucket-name: ${MINIO_BUCKET_NAME:dev-bucket}
+    access-key: ${MINIO_ACCESS_KEY:admin}
+    secret-key: ${MINIO_SECRET_KEY:admin123}
+    auto-create-bucket: true
+    domain: ${MINIO_DOMAIN:}
+

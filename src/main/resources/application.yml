@@ -158,8 +158,8 @@ sys:
 
 # 自定义文件上传配置
 file:
-  # 必须与 StorageType 枚举完全一致: LOCAL, ALIYUN_OSS
-  active: LOCAL
+  # 必须与 StorageType 枚举完全一致: LOCAL, ALIYUN_OSS, MINIO
+  active: ${FILE_STORAGE_ACTIVE:LOCAL}
 
   local:
     domain: http://localhost:8080
@@ -172,6 +172,14 @@ file:
     bucket-name: my-bucket
     access-key: xxxx
     secret-key: xxxx
+
+  minio:
+    domain: ${MINIO_DOMAIN:}
+    endpoint: ${MINIO_ENDPOINT:http://127.0.0.1:9000}
+    bucket-name: ${MINIO_BUCKET_NAME:dev-bucket}
+    access-key: ${MINIO_ACCESS_KEY:admin}
+    secret-key: ${MINIO_SECRET_KEY:admin123}
+    auto-create-bucket: true
 
 # =========================================================
 # JustAuth 第三方登录配置
