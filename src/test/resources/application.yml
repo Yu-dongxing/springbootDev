@@ -13,17 +13,17 @@ spring:
       minimum-idle: 1
       initialization-fail-timeout: 0
 
-# 禁用 Aegis DB Engine 的自动初始化，防止测试环境因为没有 MySQL 专有元数据表导致报错
+# 启用 Aegis DB Engine 的自动初始化，在测试环境下自动同步内存表结构
 db:
   init:
-    enabled: false
-    init-data: false
+    enabled: true
+    init-data: true
 
-# 禁用系统配置热初始化，防止测试环境因没有 sys_config 表而访问失败
+# 启用系统配置初始化
 sys:
   config:
     init:
-      enabled: false
+      enabled: true
 
 # 测试环境下文件上传的基础配置
 file:

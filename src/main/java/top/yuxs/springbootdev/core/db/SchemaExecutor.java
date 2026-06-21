@@ -27,15 +27,28 @@ import java.util.stream.Collectors;
 public class SchemaExecutor {
 
     private final JdbcTemplate jdbcTemplate;
+    private Boolean isH2 = null;
+
+    public boolean isH2Database() {
+        if (isH2 == null) {
+            try (java.sql.Connection conn = jdbcTemplate.getDataSource().getConnection()) {
+                String dbProduct = conn.getMetaData().getDatabaseProductName();
+                isH2 = "H2".equalsIgnoreCase(dbProduct);
+            } catch (Exception e) {
+                isH2 = false;
+            }
+        }
+        return isH2;
+    }
 
     public boolean tableExists(String tableName) {
-        String sql = "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
+        String sql = "SELECT COUNT(*) FROM information_schema.TABLES WHERE (LOWER(TABLE_SCHEMA) = LOWER(DATABASE()) OR (LOWER(TABLE_SCHEMA) = 'public' AND LOWER(TABLE_CATALOG) = LOWER(DATABASE()))) AND TABLE_NAME = ?";
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class, tableName);
         return count != null && count > 0;
     }
 
     public Map<String, top.yuxs.springbootdev.core.db.metadata.ColumnMetadata> getExistingColumnsInfo(String tableName) {
-        String sql = "SELECT COLUMN_NAME, COLUMN_TYPE, COLUMN_COMMENT FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
+        String sql = "SELECT COLUMN_NAME, COLUMN_TYPE, COLUMN_COMMENT FROM information_schema.COLUMNS WHERE (LOWER(TABLE_SCHEMA) = LOWER(DATABASE()) OR (LOWER(TABLE_SCHEMA) = 'public' AND LOWER(TABLE_CATALOG) = LOWER(DATABASE()))) AND TABLE_NAME = ?";
         Map<String, top.yuxs.springbootdev.core.db.metadata.ColumnMetadata> map = new HashMap<>();
         jdbcTemplate.query(sql, (rs) -> {
             String colName = rs.getString("COLUMN_NAME");
@@ -53,13 +66,13 @@ public class SchemaExecutor {
     }
 
     public Set<String> getExistingIndexNames(String tableName) {
-        String sql = "SELECT DISTINCT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME != 'PRIMARY'";
+        String sql = "SELECT DISTINCT INDEX_NAME FROM information_schema.STATISTICS WHERE (LOWER(TABLE_SCHEMA) = LOWER(DATABASE()) OR (LOWER(TABLE_SCHEMA) = 'public' AND LOWER(TABLE_CATALOG) = LOWER(DATABASE()))) AND TABLE_NAME = ? AND INDEX_NAME != 'PRIMARY'";
         List<String> list = jdbcTemplate.queryForList(sql, String.class, tableName);
         return list.stream().map(String::toLowerCase).collect(Collectors.toSet());
     }
 
     public Set<String> getExistingForeignKeyNames(String tableName) {
-        String sql = "SELECT CONSTRAINT_NAME FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_TYPE = 'FOREIGN KEY'";
+        String sql = "SELECT CONSTRAINT_NAME FROM information_schema.TABLE_CONSTRAINTS WHERE (LOWER(CONSTRAINT_SCHEMA) = LOWER(DATABASE()) OR (LOWER(CONSTRAINT_SCHEMA) = 'public' AND LOWER(CONSTRAINT_CATALOG) = LOWER(DATABASE()))) AND TABLE_NAME = ? AND CONSTRAINT_TYPE = 'FOREIGN KEY'";
         List<String> list = jdbcTemplate.queryForList(sql, String.class, tableName);
         return list.stream().map(String::toLowerCase).collect(Collectors.toSet());
     }

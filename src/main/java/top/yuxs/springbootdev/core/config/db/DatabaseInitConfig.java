@@ -7,14 +7,14 @@
 
 package top.yuxs.springbootdev.core.config.db;
 
-import org.springframework.boot.CommandLineRunner;
+import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 import top.yuxs.springbootdev.core.db.DatabaseInitService;
 
 @Configuration
 @ConditionalOnProperty(prefix = "db.init", name = "enabled", havingValue = "true", matchIfMissing = true)
-public class DatabaseInitConfig implements CommandLineRunner {
+public class DatabaseInitConfig implements SmartInitializingSingleton {
 
     private final DatabaseInitService databaseInitService;
 
@@ -23,7 +23,7 @@ public class DatabaseInitConfig implements CommandLineRunner {
     }
 
     @Override
-    public void run(String... args) {
+    public void afterSingletonsInstantiated() {
         databaseInitService.initDatabase();
     }
 }

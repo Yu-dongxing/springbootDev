@@ -80,7 +80,11 @@ public class DatabaseInitService {
                 log.info("表 {} 不存在，准备创建", tableName);
                 schemaExecutor.execute(sqlGenerator.generateCreateTableSql(table));
             } else {
-                updateTableColumnsAndIndexes(table);
+                if (!schemaExecutor.isH2Database()) {
+                    updateTableColumnsAndIndexes(table);
+                } else {
+                    log.debug("检测到 H2 内存数据库且表 {} 已存在，单元测试环境下跳过结构增量同步", tableName);
+                }
             }
         } catch (Exception e) {
             log.error("同步表 {} 结构失败: {}", tableName, e.getMessage(), e);
@@ -136,6 +140,10 @@ public class DatabaseInitService {
     private void syncForeignKeys(TableMetadata table) {
         String tableName = table.getTableName();
         try {
+            if (schemaExecutor.isH2Database() && schemaExecutor.tableExists(tableName)) {
+                log.debug("检测到 H2 内存数据库且表 {} 已存在，单元测试环境下跳过外键约束同步", tableName);
+                return;
+            }
             Set<String> existingFks = schemaExecutor.getExistingForeignKeyNames(tableName);
             for (ForeignKey fk : table.getForeignKeys()) {
                 if (!existingFks.contains(fk.name().toLowerCase())) {
